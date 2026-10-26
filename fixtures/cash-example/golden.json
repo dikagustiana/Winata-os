@@ -1,0 +1,112 @@
+{
+  "weeks": [
+    {
+      "weekStart": "2026-10-26",
+      "collectionIn": 0,
+      "otherIn": 10000000,
+      "outflow": 242000000,
+      "net": -232000000,
+      "ending": 18000000
+    },
+    {
+      "weekStart": "2026-11-02",
+      "collectionIn": 510000000,
+      "otherIn": 0,
+      "outflow": 337000000,
+      "net": 173000000,
+      "ending": 191000000
+    },
+    {
+      "weekStart": "2026-11-09",
+      "collectionIn": 720000000,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": 478000000,
+      "ending": 669000000
+    },
+    {
+      "weekStart": "2026-11-16",
+      "collectionIn": 960000000,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": 718000000,
+      "ending": 1387000000
+    },
+    {
+      "weekStart": "2026-11-23",
+      "collectionIn": 450000000,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": 208000000,
+      "ending": 1595000000
+    },
+    {
+      "weekStart": "2026-11-30",
+      "collectionIn": 240000000,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": -2000000,
+      "ending": 1593000000
+    },
+    {
+      "weekStart": "2026-12-07",
+      "collectionIn": 0,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": -242000000,
+      "ending": 1351000000
+    },
+    {
+      "weekStart": "2026-12-14",
+      "collectionIn": 0,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": -242000000,
+      "ending": 1109000000
+    },
+    {
+      "weekStart": "2026-12-21",
+      "collectionIn": 0,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": -242000000,
+      "ending": 867000000
+    },
+    {
+      "weekStart": "2026-12-28",
+      "collectionIn": 0,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": -242000000,
+      "ending": 625000000
+    },
+    {
+      "weekStart": "2027-01-04",
+      "collectionIn": 0,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": -242000000,
+      "ending": 383000000
+    },
+    {
+      "weekStart": "2027-01-11",
+      "collectionIn": 0,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": -242000000,
+      "ending": 141000000
+    },
+    {
+      "weekStart": "2027-01-18",
+      "collectionIn": 0,
+      "otherIn": 0,
+      "outflow": 242000000,
+      "net": -242000000,
+      "ending": -101000000
+    }
+  ],
+  "lowest": {
+    "weekStart": "2027-01-18",
+    "balance": -101000000
+  }
+}

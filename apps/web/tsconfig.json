@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "es2022"],
+    "jsx": "preserve",
+    "incremental": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"],
+      "@winata/engine": ["../../packages/engine/src/index.ts"],
+      "@winata/engine/*": ["../../packages/engine/src/*"],
+      "@winata/db": ["../../packages/db/src/index.ts"],
+      "@winata/db/local": ["../../packages/db/src/local-client.ts"],
+      "@winata/parsers": ["../../packages/parsers/src/index.ts"]
+    },
+    "plugins": [{ "name": "next" }]
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}

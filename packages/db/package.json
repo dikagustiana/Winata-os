@@ -1,0 +1,20 @@
+{
+  "name": "@winata/db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./local": "./src/local-client.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.3.14",
+    "@winata/engine": "workspace:*",
+    "decimal.js": "^10.6.0"
+  }
+}

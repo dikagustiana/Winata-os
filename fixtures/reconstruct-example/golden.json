@@ -1,0 +1,93 @@
+{
+  "rows": [
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333301",
+      "t0Closing": 20000,
+      "production": 13500,
+      "outbound": 1200,
+      "shrinkage": 0,
+      "closing": 7700
+    },
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333302",
+      "t0Closing": 8000,
+      "production": 4340,
+      "outbound": 400,
+      "shrinkage": 0,
+      "closing": 4060
+    },
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333303",
+      "t0Closing": 2000,
+      "production": 680,
+      "outbound": 0,
+      "shrinkage": 0,
+      "closing": 1320
+    },
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333304",
+      "t0Closing": 300,
+      "production": 38,
+      "outbound": 0,
+      "shrinkage": 5,
+      "closing": 267
+    },
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333305",
+      "t0Closing": 100,
+      "production": 0,
+      "outbound": 0,
+      "shrinkage": 0,
+      "closing": 100
+    }
+  ],
+  "totalClosingKg": 13447,
+  "missingDay": "2026-07-10",
+  "missingRows": [
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333301",
+      "t0Closing": 20000,
+      "production": 13500,
+      "outbound": 1200,
+      "shrinkage": 0,
+      "closing": 7700,
+      "lowerKg": 6350
+    },
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333302",
+      "t0Closing": 8000,
+      "production": 4340,
+      "outbound": 400,
+      "shrinkage": 0,
+      "closing": 4060,
+      "lowerKg": 3440
+    },
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333303",
+      "t0Closing": 2000,
+      "production": 680,
+      "outbound": 0,
+      "shrinkage": 0,
+      "closing": 1320,
+      "lowerKg": 1150
+    },
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333304",
+      "t0Closing": 300,
+      "production": 38,
+      "outbound": 0,
+      "shrinkage": 5,
+      "closing": 267,
+      "lowerKg": 267
+    },
+    {
+      "gradeId": "33333333-3333-3333-3333-333333333305",
+      "t0Closing": 100,
+      "production": 0,
+      "outbound": 0,
+      "shrinkage": 0,
+      "closing": 100,
+      "lowerKg": 100
+    }
+  ]
+}
