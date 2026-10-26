@@ -20,9 +20,9 @@ afterAll(async () => {
 });
 
 describe("T-01 migrasi dari nol", () => {
-  it("semua migrasi berjalan dan versi skema 1.0.0", async () => {
+  it("semua migrasi berjalan dan versi skema 1.1.0", async () => {
     const version = await db.query<{ v: string }>(`select schema_version() as v`);
-    expect(version.rows[0].v).toBe("1.0.0");
+    expect(version.rows[0].v).toBe("1.1.0");
   });
 
   it("tabel inti ada", async () => {
