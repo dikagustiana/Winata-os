@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { USERS, expectNoHorizontalScroll, login } from "./helpers";
+import { USERS, dateShort, expectNoHorizontalScroll, login, todayJakarta } from "./helpers";
 
 const MENUS: Array<{ role: keyof typeof USERS; items: string[]; forbidden: string; allowed: string }> = [
   { role: "kandang", items: ["Hari ini", "Hitung fisik"], forbidden: "/master", allowed: "/hari" },
@@ -78,6 +78,8 @@ test.describe("T-06 tata letak 390 dan 1366 px tanpa scroll samping", () => {
 test.describe("Tanggal hari ini", () => {
   test("dashboard memakai tanggal WIB", async ({ page }) => {
     await login(page, USERS.kandang);
-    await expect(page.getByText(/26 Okt 2026/).first()).toBeVisible();
+    // Tanggal WIB hari ini (bukan tanggal tetap, agar tes tidak kedaluwarsa).
+    const today = todayJakarta();
+    await expect(page.getByText(`${dateShort(today)} ${today.slice(0, 4)}`).first()).toBeVisible();
   });
 });
