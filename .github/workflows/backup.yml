@@ -1,0 +1,55 @@
+name: backup
+
+# Backup harian database Supabase (HANDOVER §7). Butuh secret repo
+# SUPABASE_DB_URL = connection string LANGSUNG (port 5432), bukan pooler 6543.
+# Tanpa secret, job berhenti dengan peringatan (tidak gagal).
+# Artefak Actions di repo PUBLIK bisa diunduh siapa pun: job hanya berjalan
+# bila repo privat (K10). Selama repo publik, backup tidak pernah dibuat.
+on:
+  schedule: [{ cron: "0 18 * * *" }] # 01:00 WIB
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dump:
+    if: ${{ github.event.repository.private == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+    steps:
+      - name: Periksa secret
+        id: check
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::warning::Secret SUPABASE_DB_URL belum diisi; backup dilewati."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pasang pg_dump 17 (sama dengan versi server Supabase)
+        if: steps.check.outputs.skip != '1'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: pg_dump
+        if: steps.check.outputs.skip != '1'
+        run: |
+          set -o pipefail
+          /usr/lib/postgresql/17/bin/pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges \
+            --schema=public --schema=auth --schema=storage \
+            | gzip > "backup-$(date +%F).sql.gz"
+          ls -lh backup-*.sql.gz
+
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.skip != '1'
+        with:
+          name: backup-${{ github.run_id }}
+          path: backup-*.sql.gz
+          retention-days: 30
