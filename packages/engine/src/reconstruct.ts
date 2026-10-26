@@ -5,6 +5,11 @@ import { addDays, diffDays, eachDay } from "./dates";
  * R-43: rekonstruksi posisi 30-06-2026.
  * closing(target) = closing(T0) − Σ produksi(1-Jul..T0) + Σ keluar(1-Jul..T0)
  *                   + Σ susut(1-Jul..T0) − Σ koreksi posted
+ *
+ * R-70 (hari bolong, estimasi):
+ *   batas atas  = closing + rata-rata keluar harian tercatat × hari bolong
+ *                 (DO yang tidak tercatat membuat closing target lebih tinggi)
+ *   batas bawah = closing − rata-rata produksi harian (5 hari terakhir Juni) × hari bolong
  */
 
 export interface GradeFlow {
@@ -21,8 +26,10 @@ export interface ReconstructInput {
   outbound: GradeFlow[];
   shrinkage: GradeFlow[];
   correction?: GradeFlow[];
-  /** Rata-rata produksi harian 5 hari terakhir Juni per grade, untuk estimasi. */
+  /** Rata-rata produksi harian 5 hari terakhir Juni per grade, untuk batas bawah. */
   juneAverageDaily?: Array<{ gradeId: string; kg: string | number }>;
+  /** Rata-rata keluar harian (DO + susut) yang tercatat Juli..T0 per grade, untuk batas atas. */
+  outboundAverageDaily?: Array<{ gradeId: string; kg: string | number }>;
   /** Tanggal tanpa recording (string ISO). */
   missingDays?: string[];
 }
@@ -76,12 +83,12 @@ export function reconstruct(input: ReconstructInput): ReconstructResult {
     let lower = closing;
     let upper = closing;
     if (hasMissing) {
-      const estimatePerDay = input.juneAverageDaily?.find((row) => row.gradeId === gradeId)?.kg ?? 0;
-      const estimate = D(estimatePerDay).times(missingDays.length);
-      // Produksi yang tidak tercatat membuat closing lebih tinggi; estimasi yang
-      // lebih tinggi membuat closing lebih rendah.
-      upper = closing;
-      lower = closing.minus(estimate);
+      const productionPerDay = input.juneAverageDaily?.find((row) => row.gradeId === gradeId)?.kg ?? 0;
+      const outboundPerDay = input.outboundAverageDaily?.find((row) => row.gradeId === gradeId)?.kg ?? 0;
+      // Produksi yang tidak tercatat menurunkan closing target (batas bawah);
+      // keluar yang tidak tercatat menaikkannya (batas atas).
+      lower = closing.minus(D(productionPerDay).times(missingDays.length));
+      upper = closing.plus(D(outboundPerDay).times(missingDays.length));
     }
 
     return {
@@ -106,6 +113,21 @@ export function reconstruct(input: ReconstructInput): ReconstructResult {
     missingDays,
     periodDays,
   };
+}
+
+/** Rata-rata harian per grade: Σ kg / jumlah hari (hari tercatat). */
+export function averageDailyByGrade(
+  flows: GradeFlow[],
+  days: number,
+): Array<{ gradeId: string; kg: string }> {
+  const totals = new Map<string, Decimal>();
+  for (const row of flows) {
+    totals.set(row.gradeId, (totals.get(row.gradeId) ?? new Decimal(0)).plus(D(row.kg)));
+  }
+  return Array.from(totals.entries()).map(([gradeId, total]) => ({
+    gradeId,
+    kg: days > 0 ? total.dividedBy(days).toFixed(3) : "0.000",
+  }));
 }
 
 /** Daftar hari 1 Juli..T0 yang tidak punya baris recording. */

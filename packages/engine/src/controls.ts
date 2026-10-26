@@ -161,7 +161,7 @@ export function computeControls(context: ControlContext): ControlResult[] {
       if (!worst) {
         results.push(result("K4", date, location.id, "ok", {}));
       } else {
-        const hasNote = Boolean(worst.note && worst.note.trim().length >= 3);
+        const hasNote = Boolean(worst.note && worst.note.trim().length >= 10);
         results.push(
           result("K4", date, location.id, hasNote ? "warn" : "fail", {
             date: worst.date,
