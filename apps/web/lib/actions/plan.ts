@@ -60,7 +60,7 @@ export async function deleteSalesPlanAction(_prev: ActionState, form: FormData):
     const { error } = await ctx.client.from("sales_plan").update({ deleted_at: new Date().toISOString() }).eq("id", id);
     if (error) return { error: error.message };
     refresh(["/rencana", "/outlook"]);
-    return done("Rencana dihapus.");
+    return done("Rencana dibatalkan.");
   } catch (error) {
     return fail(error);
   }

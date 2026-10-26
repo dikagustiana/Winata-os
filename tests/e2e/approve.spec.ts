@@ -54,7 +54,7 @@ test.describe("T-29 journey A: submit → approve → lock → koreksi", () => {
 
     const correctionRow = page.locator("tbody tr").filter({ hasText: "koreksi uji e2e" }).first();
     await correctionRow.getByRole("button", { name: "Posting" }).click();
-    await expect(correctionRow.getByText("Posted")).toBeVisible();
+    await expect(correctionRow.getByText("Diposting")).toBeVisible();
 
     await page.goto("/");
     await expect(page.getByRole("heading", { level: 1, name: "Posisi telur" })).toBeVisible();

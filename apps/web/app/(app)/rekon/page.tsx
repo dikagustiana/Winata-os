@@ -20,7 +20,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { DateInput, SelectInput, TextInput } from "@/components/ui/Inputs";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { lockDayAction, createCorrectionAction, approveCorrectionAction, postCorrectionAction } from "@/lib/actions/workflow";
+import { lockDayAction, createCorrectionAction, approveCorrectionAction, postCorrectionAction, cancelCorrectionAction } from "@/lib/actions/workflow";
 import { saveCashBalanceAction, saveCashPlanAction } from "@/lib/actions/plan";
 import { importCsvAction, saveItemMapAction, saveReconciliationAction, updateReconItemAction, uploadAccurateAction } from "@/lib/actions/recon";
 import { IMPORT_COLUMNS } from "@winata/parsers";
@@ -42,7 +42,7 @@ type TabKey = (typeof TABS)[number]["key"];
 export default async function RekonPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; period?: string; edit?: string }>;
+  searchParams: Promise<{ tab?: string; period?: string; edit?: string; batal?: string; koreksi?: string }>;
 }) {
   const viewer = await requireRole(["accounting", "admin", "bod"]);
   const query = await searchParams;
@@ -74,12 +74,37 @@ export default async function RekonPage({
     .order("date", { ascending: false })
     .limit(40)).data as DayStatusRow[]) ?? [];
 
-  const corrections = ((await client
-    .from("correction")
-    .select("*")
-    .is("deleted_at", null)
+  const showCancelled = isAccounting && query.batal === "1";
+  const correctionQuery = client.from("correction").select("*");
+  const corrections = ((await (showCancelled ? correctionQuery : correctionQuery.is("deleted_at", null))
     .order("created_at", { ascending: false })
-    .limit(40)).data as CorrectionRow[]) ?? [];
+    .limit(40)).data as Array<CorrectionRow & { deleted_at?: string | null; delete_reason?: string | null }>) ?? [];
+
+  // Tombol Posting nonaktif bila di atas batas BoD dan belum disetujui (dihitung di server).
+  const bodRp = paramNumber(parameters, "bod_threshold_rp", 10_000_000);
+  const bodPct = paramNumber(parameters, "bod_threshold_pct", 0.02);
+  const bodLimitText = `Melebihi batas BoD (Rp ${String(bodRp / 1_000_000).replace(".", ",")} jt / ${String(bodPct * 100).replace(".", ",")} % stok). Menunggu persetujuan BoD.`;
+  const needsBod = new Map<string, boolean>();
+  for (const row of corrections) {
+    if (row.status !== "draft" || row.deleted_at) continue;
+    let over = Math.abs(Number(row.amount_rp)) > bodRp;
+    if (!over) {
+      const stockRows = ((await client
+        .from("position_daily")
+        .select("date,closing")
+        .eq("location_id", row.location_id)
+        .lte("date", row.effective_date)
+        .order("date", { ascending: false })
+        .limit(20)).data as Array<{ date: string; closing: string }>) ?? [];
+      const latest = stockRows[0]?.date;
+      const stock = Math.abs(stockRows.filter((item) => item.date === latest).reduce((acc, item) => acc + Number(item.closing), 0));
+      over = stock > 0 && Math.abs(Number(row.kg)) > bodPct * stock;
+    }
+    needsBod.set(row.id, over);
+  }
+  const cancelCorrection = isAccounting && query.koreksi
+    ? corrections.find((row) => row.id === query.koreksi && !row.deleted_at) ?? null
+    : null;
 
   const uploads = ((await client
     .from("accurate_upload")
@@ -222,21 +247,78 @@ export default async function RekonPage({
                 kg: fmtKg(row.kg, 1),
                 rp: fmtRp(row.amount_rp),
                 alasan: row.reason,
-                status: <StatusChip status={row.status === "posted" ? "locked" : row.status === "approved" ? "approved" : "draft"} label={row.status === "posted" ? "Posted" : row.status === "approved" ? "Disetujui BoD" : "Draft"} />,
-                aksi:
-                  row.status === "posted" ? null : viewer.role === "bod" ? (
-                    <ActionForm action={approveCorrectionAction} submitLabel="Setujui">
-                      <input type="hidden" name="correction_id" value={row.id} />
-                    </ActionForm>
-                  ) : isAccounting ? (
-                    <ActionForm action={postCorrectionAction} submitLabel="Posting">
-                      <input type="hidden" name="correction_id" value={row.id} />
-                    </ActionForm>
-                  ) : null,
+                status: row.deleted_at ? (
+                  <span style={{ textDecoration: "line-through" }} title={row.delete_reason ?? undefined}>
+                    <StatusChip status="neutral" label="Dibatalkan" />
+                  </span>
+                ) : row.status === "posted" ? (
+                  <StatusChip status="ok" label="Diposting" />
+                ) : row.status === "approved" ? (
+                  <StatusChip status="approved" label="Disetujui BoD" />
+                ) : (
+                  <StatusChip status="draft" label="Draft" />
+                ),
+                aksi: row.deleted_at ? null : (
+                  <div className="row">
+                    {row.status !== "posted" && viewer.role === "bod" ? (
+                      <ActionForm action={approveCorrectionAction} submitLabel="Setujui">
+                        <input type="hidden" name="correction_id" value={row.id} />
+                      </ActionForm>
+                    ) : null}
+                    {row.status !== "posted" && isAccounting ? (
+                      needsBod.get(row.id) ? (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          disabled
+                          title={bodLimitText}
+                        >
+                          Posting
+                        </button>
+                      ) : (
+                        <ActionForm action={postCorrectionAction} submitLabel="Posting">
+                          <input type="hidden" name="correction_id" value={row.id} />
+                        </ActionForm>
+                      )
+                    ) : null}
+                    {isAccounting ? (
+                      <Link href={`/rekon?tab=koreksi&koreksi=${row.id}`} className="btn btn-sm">
+                        Batalkan
+                      </Link>
+                    ) : null}
+                  </div>
+                ),
               }))}
               empty="Belum ada koreksi."
             />
+            {isAccounting ? (
+              <p className="small" style={{ marginTop: 8 }}>
+                {showCancelled ? (
+                  <Link href="/rekon?tab=koreksi">Sembunyikan yang dibatalkan</Link>
+                ) : (
+                  <Link href="/rekon?tab=koreksi&batal=1">Tampilkan yang dibatalkan</Link>
+                )}
+              </p>
+            ) : null}
           </Card>
+          {cancelCorrection ? (
+            <Card
+              title="Batalkan koreksi"
+              sub={`${fmtDate(cancelCorrection.effective_date)} · ${locationById.get(cancelCorrection.location_id)?.code ?? "—"} · ${fmtKg(cancelCorrection.kg, 1)} kg`}
+            >
+              <ActionForm
+                action={cancelCorrectionAction}
+                buttons={[{ label: "Batalkan koreksi", variant: "danger", confirm: "Yakin membatalkan koreksi ini? Data tetap tersimpan dengan jejak." }]}
+              >
+                <input type="hidden" name="correction_id" value={cancelCorrection.id} />
+                <TextInput
+                  name="delete_reason"
+                  label="Alasan pembatalan"
+                  help="Wajib minimal 10 karakter untuk koreksi yang sudah diposting."
+                />
+              </ActionForm>
+            </Card>
+          ) : null}
         </div>
       ) : null}
 

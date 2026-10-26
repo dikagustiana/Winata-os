@@ -55,7 +55,7 @@ export async function saveDayAction(_prev: ActionState, form: FormData): Promise
           if (existing.data) {
             const { error } = await ctx.client
               .from("production")
-              .update({ qty: "0", kg: "0", deleted_at: new Date().toISOString() })
+              .update({ deleted_at: new Date().toISOString(), delete_reason: "Qty dikosongkan di layar Hari" })
               .eq("id", existing.data.id);
             if (error) return { error: error.message };
             saved += 1;

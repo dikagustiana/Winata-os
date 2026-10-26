@@ -1,15 +1,11 @@
 "use server";
 
-import { createHash } from "node:crypto";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { isMockAuth, getAuthClient, getServiceClient } from "./supabase/server";
 import { getLocalDb } from "./local-db";
+import { LOGIN_FAILED, mockPasswordError } from "./mock-auth";
 import type { ActionState } from "./action-types";
-
-function hashLocalPassword(password: string): string {
-  return createHash("sha256").update(`${password}::winata-local`).digest("hex");
-}
 
 export async function loginAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
@@ -18,26 +14,25 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     return { error: "Email dan kata sandi wajib diisi." };
   }
 
-  const service = await getServiceClient();
-  const { data: user } = await service
-    .from("app_user")
-    .select("id,email,active,role")
-    .eq("email", email)
-    .maybeSingle();
-  if (!user || !user.active) {
-    return { error: "Email atau kata sandi salah." };
-  }
-
   if (isMockAuth()) {
+    const service = await getServiceClient();
+    const { data: user } = await service
+      .from("app_user")
+      .select("id,email,active,role")
+      .eq("email", email)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!user || !user.active) {
+      return { error: LOGIN_FAILED };
+    }
     const db = await getLocalDb();
     const stored = await db.query<{ password_hash: string | null }>(
       `select password_hash from auth.users where lower(email) = lower($1)`,
       [email],
     );
-    const hash = stored.rows[0]?.password_hash;
-    if (hash && hash !== hashLocalPassword(password)) {
-      return { error: "Email atau kata sandi salah." };
-    }
+    // R-72: user tanpa password_hash ditolak (tidak lagi lolos dengan sandi apa pun).
+    const passwordError = mockPasswordError(stored.rows[0]?.password_hash, password);
+    if (passwordError) return { error: passwordError };
     const store = await cookies();
     store.set("mock_user", email, {
       httpOnly: true,
@@ -48,8 +43,20 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
     });
   } else {
     const supabase = await getAuthClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: "Email atau kata sandi salah." };
+    const { data: session, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !session.user) return { error: LOGIN_FAILED };
+    // Allow-list: login Auth tanpa app_user aktif tidak boleh masuk.
+    const { data: user } = await supabase
+      .from("app_user")
+      .select("id,active")
+      .eq("id", session.user.id)
+      .eq("active", true)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!user) {
+      await supabase.auth.signOut();
+      return { error: LOGIN_FAILED };
+    }
   }
 
   redirect("/");

@@ -9,7 +9,7 @@ export const USERS = {
   accounting: "accounting@winata.test",
   marketing: "marketing@winata.test",
   bod: "bod@winata.test",
-  admin: "dika@winata.co.id",
+  admin: "dika.g.irawan@gmail.com",
 } as const;
 
 export async function login(page: Page, email: string, password = PASSWORD) {

@@ -191,7 +191,10 @@ export default async function RencanaPage() {
             harga: plan.price_per_kg ? fmtRp(plan.price_per_kg) : "—",
             jenis: plan.kind === "order" ? "Order" : "Forecast",
             aksi: (
-              <ActionForm action={deleteSalesPlanAction} submitLabel="Hapus">
+              <ActionForm
+                action={deleteSalesPlanAction}
+                buttons={[{ label: "Batalkan", variant: "danger", confirm: "Batalkan rencana ini? Data tetap tersimpan dengan jejak." }]}
+              >
                 <input type="hidden" name="plan_id" value={plan.id} />
               </ActionForm>
             ),

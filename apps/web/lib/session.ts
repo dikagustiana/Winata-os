@@ -2,14 +2,16 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { notFound } from "next/navigation";
-import type { AppRole, LocationRow, Viewer } from "@winata/db";
+import type { AppRole, DataClient, LocationRow, Viewer } from "@winata/db";
 import { getAuthClient, getServiceClient, isMockAuth } from "./supabase/server";
 
 /**
- * getViewer membaca sesi + app_user (allow-list) + penugasan lokasi.
- * Di MOCK_AUTH: cookie mock_user=<email>. Di cloud: Supabase Auth.
+ * getViewer membaca sesi + app_user (allow-list) + penugasan lokasi aktif.
+ * Di MOCK_AUTH: cookie mock_user=<email>. Di cloud: Supabase Auth + RLS
+ * (app_user.id = auth.users.id, R-64).
  */
 export const getViewer = cache(async (): Promise<Viewer | null> => {
+  let client: DataClient;
   let appUserId: string | null = null;
   let email: string | null = null;
 
@@ -17,6 +19,7 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     const store = await cookies();
     email = store.get("mock_user")?.value?.toLowerCase() ?? null;
     if (!email) return null;
+    client = await getServiceClient();
   } else {
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
     const supabase = await getAuthClient();
@@ -24,10 +27,12 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     appUserId = data.user?.id ?? null;
     email = data.user?.email?.toLowerCase() ?? null;
     if (!appUserId || !email) return null;
+    // Klien pengguna (RLS): app_user/user_location baris sendiri, lokasi untuk
+    // pengguna aktif. Tidak butuh service-role key.
+    client = supabase as unknown as DataClient;
   }
 
-  const service = await getServiceClient();
-  const query = service
+  const query = client
     .from("app_user")
     .select("id,email,name,role,active")
     .eq("active", true)
@@ -38,15 +43,16 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
 
   if (error || !user) return null;
 
-  const { data: assignments } = await service
+  const { data: assignments } = await client
     .from("user_location")
     .select("location_id")
-    .eq("user_id", user.id);
+    .eq("user_id", user.id)
+    .is("deleted_at", null);
 
   const locationIds = ((assignments as Array<{ location_id: string }> | null) ?? []).map((a) => a.location_id);
   let locations: LocationRow[] = [];
   if (locationIds.length > 0) {
-    const { data: rows } = await service
+    const { data: rows } = await client
       .from("location")
       .select("id,code,name,kind,active")
       .in("id", locationIds)

@@ -31,7 +31,7 @@ export default async function LoginPage() {
           <p className="login-hint" style={{ marginTop: 16 }}>
             Mode lokal: akun uji memakai kata sandi <strong>winata123</strong>. Contoh: kandang.slp@winata.test,
             manager@winata.test, accounting@winata.test, marketing@winata.test, bod@winata.test,
-            dika@winata.co.id.
+            dika.g.irawan@gmail.com.
           </p>
         ) : null}
       </div>

@@ -17,9 +17,12 @@ import {
 import { loadConversionVersions, nextDoNumber } from "@/lib/convert";
 import { parseIdNumber } from "@/lib/format";
 import type { ActionState } from "@/lib/action-types";
+import { CANCEL_REASON_REQUIRED, DO_LOCKED_CANNOT_CANCEL } from "@/lib/errors";
 
 const DOC_ROLES: AppRole[] = ["marketing", "accounting", "admin"];
 const HANDOVER_ROLES: AppRole[] = ["kandang", "accounting", "admin"];
+// K14: dikirim → diterima oleh marketing/accounting (bukan kandang).
+const RECEIVE_ROLES: AppRole[] = ["marketing", "accounting", "admin"];
 
 export async function createOutboundAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   try {
@@ -147,11 +150,12 @@ export async function confirmHandoverAction(_prev: ActionState, form: FormData):
 
 export async function markReceivedAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   try {
-    const ctx = await actionContext(HANDOVER_ROLES);
+    const ctx = await actionContext(RECEIVE_ROLES);
     if (isActionState(ctx)) return ctx;
     const outboundId = text(form, "outbound_id");
-    const outbound = await ctx.client.from("outbound").select("id,location_id,date").eq("id", outboundId).maybeSingle();
+    const outbound = await ctx.client.from("outbound").select("id,location_id,date,status").eq("id", outboundId).maybeSingle();
     if (!outbound.data) return { error: "DO tidak ditemukan." };
+    if (outbound.data.status !== "dikirim") return { error: "Hanya DO berstatus dikirim yang bisa ditandai diterima." };
     const { error } = await ctx.client
       .from("outbound")
       .update({ status: "diterima", updated_at: new Date().toISOString() })
@@ -159,6 +163,45 @@ export async function markReceivedAction(_prev: ActionState, form: FormData): Pr
     if (error) return { error: error.message };
     refresh(["/do", "/"]);
     return done("DO ditandai diterima pelanggan.");
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** R-63: DO dibatalkan (deleted_at + alasan), bukan dihapus. */
+export async function cancelOutboundAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await actionContext(DOC_ROLES);
+    if (isActionState(ctx)) return ctx;
+    const outboundId = text(form, "outbound_id");
+    const reason = optionalText(form, "delete_reason");
+    const outbound = await ctx.client
+      .from("outbound")
+      .select("id,location_id,date,status,do_number")
+      .eq("id", outboundId)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!outbound.data) return { error: "DO tidak ditemukan." };
+    const day = await ctx.client
+      .from("day_status")
+      .select("status")
+      .eq("location_id", outbound.data.location_id)
+      .eq("date", outbound.data.date)
+      .is("deleted_at", null)
+      .maybeSingle();
+    const dayStatus = (day.data as { status: string } | null)?.status ?? "open";
+    if (dayStatus === "locked") return { error: DO_LOCKED_CANNOT_CANCEL };
+    if (dayStatus === "approved" && (reason ?? "").length < 10) return { error: CANCEL_REASON_REQUIRED };
+    const { data, error } = await ctx.client
+      .from("outbound")
+      .update({ deleted_at: new Date().toISOString(), delete_reason: reason })
+      .eq("id", outboundId)
+      .select("id");
+    if (error) return { error: error.message };
+    if (!data || (data as unknown[]).length === 0) return { error: "DO tidak bisa dibatalkan oleh peran Anda pada status hari ini." };
+    await rebuildLocal(outbound.data.location_id, outbound.data.date);
+    refresh(["/do", "/hari", "/"]);
+    return done(`DO ${outbound.data.do_number} dibatalkan; data tetap tersimpan dengan jejak.`);
   } catch (error) {
     return fail(error);
   }

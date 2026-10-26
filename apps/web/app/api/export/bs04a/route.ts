@@ -2,7 +2,6 @@ import ExcelJS from "exceljs";
 import { todayJakarta } from "@winata/db";
 import { getViewer } from "@/lib/session";
 import { viewerClient } from "@/lib/data";
-import { getServiceClient } from "@/lib/supabase/server";
 import { buildBs04aFromDb } from "@/lib/recon";
 import { paramNumber, loadParameters } from "@/lib/data";
 
@@ -99,8 +98,6 @@ export async function GET(request: Request) {
   sheet.getCell(`G${4 + rows.length}`).numFmt = "#,##0";
 
   const buffer = await workbook.xlsx.writeBuffer();
-  const service = await getServiceClient();
-  void service;
   return new Response(new Uint8Array(buffer as ArrayBuffer), {
     headers: {
       "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

@@ -4,6 +4,7 @@
 import { actionContext, done, fail, isActionState, isoDate, optionalText, refresh, text, rebuildLocal } from "./common";
 import { parseIdNumber } from "@/lib/format";
 import type { ActionState } from "@/lib/action-types";
+import { CANCEL_REASON_REQUIRED } from "@/lib/errors";
 
 export async function approveDayAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   try {
@@ -124,4 +125,34 @@ export async function decideCorrectionAction(_prev: ActionState, form: FormData)
   const role = text(form, "role");
   if (role === "bod") return approveCorrectionAction(_prev, form);
   return postCorrectionAction(_prev, form);
+}
+
+/** R-63/K11: koreksi dibatalkan (deleted_at + alasan); posted wajib alasan ≥ 10 karakter. */
+export async function cancelCorrectionAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await actionContext(["accounting", "admin"]);
+    if (isActionState(ctx)) return ctx;
+    const id = text(form, "correction_id");
+    const reason = optionalText(form, "delete_reason");
+    const correction = await ctx.client
+      .from("correction")
+      .select("id,status,location_id,effective_date")
+      .eq("id", id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!correction.data) return { error: "Koreksi tidak ditemukan." };
+    if (correction.data.status === "posted" && (reason ?? "").length < 10) return { error: CANCEL_REASON_REQUIRED };
+    const { error } = await ctx.client
+      .from("correction")
+      .update({ deleted_at: new Date().toISOString(), delete_reason: reason })
+      .eq("id", id);
+    if (error) return { error: error.message };
+    if (correction.data.status === "posted") {
+      await rebuildLocal(correction.data.location_id, correction.data.effective_date);
+    }
+    refresh(["/rekon", "/"]);
+    return done("Koreksi dibatalkan; data tetap tersimpan dengan jejak.");
+  } catch (error) {
+    return fail(error);
+  }
 }

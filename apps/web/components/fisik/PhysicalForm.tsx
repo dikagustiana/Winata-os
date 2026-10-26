@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import type { ActionState } from "@/lib/action-types";
 import { Card } from "@/components/ui/Card";
+import { translateDbError } from "@/lib/errors";
 
 type ServerAction = (state: ActionState, formData: FormData) => Promise<ActionState>;
 
@@ -207,7 +208,7 @@ export function PhysicalForm({
       <div aria-live="polite">
         {state.error ? (
           <div className="banner banner-fail" role="alert">
-            {state.error}
+            {translateDbError(state.error)}
           </div>
         ) : null}
         {state.ok ? <div className="banner banner-ok">{state.message ?? "Tersimpan."}</div> : null}

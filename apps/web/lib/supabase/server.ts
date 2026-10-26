@@ -3,9 +3,17 @@ import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { createLocalClient, type DataClient, type ViewerClaims } from "@winata/db";
 import { getLocalDb } from "../local-db";
+import { isMockAuth } from "../mock-mode";
 
-export function isMockAuth(): boolean {
-  return process.env.MOCK_AUTH === "1" || process.env.NODE_ENV === "test";
+export { isMockAuth };
+
+/** Teks DESIGN-v1.1 §2 untuk fitur yang butuh SUPABASE_SERVICE_ROLE_KEY. */
+export const SERVICE_KEY_MISSING =
+  "Fitur ini menunggu konfigurasi server (kunci layanan Supabase). Hubungi admin.";
+
+/** Cloud: kunci layanan diisi pemilik. Mock: selalu tersedia (PGlite). */
+export function hasServiceKey(): boolean {
+  return isMockAuth() || Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
 }
 
 function requireEnv(name: string): string {
@@ -15,15 +23,17 @@ function requireEnv(name: string): string {
 }
 
 /**
- * Klien dengan hak penuh (melewati RLS) — HANYA untuk server: worker rebuild,
- * cron, bootstrap sesi, dan pembuatan akun oleh admin. Tidak pernah ke klien.
+ * Klien dengan hak penuh (melewati RLS) — HANYA untuk server: Auth admin
+ * (buat akun/kata sandi) dan Storage. Sesi, aksi, dan worker cloud tidak
+ * memakainya (K17), sehingga app tetap jalan sebelum kunci diisi pemilik.
  */
 export async function getServiceClient(): Promise<DataClient> {
   if (isMockAuth()) {
     return createLocalClient(await getLocalDb(), null) as unknown as DataClient;
   }
   const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
-  const key = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) throw new Error(SERVICE_KEY_MISSING);
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   }) as unknown as DataClient;

@@ -3,6 +3,8 @@
  * 1. Tidak ada kode spesifikasi (K1, R-10, Q-1, T-01) di teks yang dilihat pengguna.
  * 2. Tidak ada placeholder sebagai label, tidak ada window.confirm.
  * 3. Kontras token utama >= 4,5:1.
+ * 4. (DESIGN-v1.1 §4) Tidak ada tombol "Hapus" (pakai Batalkan/Nonaktifkan) dan
+ *    tidak ada akun jurnal karangan "5-2100"/"1-1300".
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -36,6 +38,12 @@ for (const dir of UI_DIRS) {
       }
       if (/\bplaceholder\s*=/.test(line) && !line.trim().startsWith("//")) {
         errors.push(`${relative}:${index + 1}: placeholder tidak boleh menggantikan label.`);
+      }
+      if (/(submitLabel|label)=["{][^>]*\bHapus\b/.test(line) || />\s*Hapus\s*</.test(line)) {
+        errors.push(`${relative}:${index + 1}: label "Hapus" dilarang; pakai "Batalkan" (transaksi) atau "Nonaktifkan" (master).`);
+      }
+      if (/\b(5-2100|1-1300)\b/.test(line)) {
+        errors.push(`${relative}:${index + 1}: akun jurnal karangan dilarang; ambil dari parameter coa_*.`);
       }
       if (ALLOWED_TITLE.test(line)) return;
 

@@ -17,8 +17,8 @@ import { loadConversionVersions } from "@/lib/convert";
 import { parseIdNumber } from "@/lib/format";
 import { putObject } from "@/lib/storage";
 import type { ActionState } from "@/lib/action-types";
-import { getLocalDb } from "@/lib/local-db";
-import { isMockAuth } from "@/lib/supabase/server";
+import { getWorkerDb } from "@/lib/cloud-db";
+import { CANCEL_REASON_REQUIRED } from "@/lib/errors";
 
 const ROLES: AppRole[] = ["kandang", "manager", "accounting", "admin"];
 
@@ -31,10 +31,13 @@ function numberOrNull(form: FormData, name: string): string | null {
 }
 
 async function refreshControls(locationId: string, date: string): Promise<void> {
-  if (!isMockAuth()) return;
-  const { processControls } = await import("@winata/db");
-  const db = await getLocalDb();
-  await processControls(db, date);
+  void locationId;
+  try {
+    const { processControls } = await import("@winata/db");
+    await processControls(await getWorkerDb(), date);
+  } catch (error) {
+    console.error("kontrol inline gagal", error);
+  }
 }
 
 async function writeConversionSample(
@@ -378,6 +381,34 @@ export async function uploadBaPhotoAction(_prev: ActionState, form: FormData): P
     if (error) return { error: error.message };
     refresh(["/fisik"]);
     return done("Foto BA tersimpan.");
+  } catch (error) {
+    return fail(error);
+  }
+}
+
+/** R-63/K13: BA opname bertanda tangan hanya dibatalkan accounting dengan alasan. */
+export async function cancelOpnameAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  try {
+    const ctx = await actionContext(["accounting", "admin"]);
+    if (isActionState(ctx)) return ctx;
+    const id = text(form, "opname_id");
+    const reason = optionalText(form, "delete_reason");
+    if ((reason ?? "").length < 10) return { error: CANCEL_REASON_REQUIRED };
+    const opname = await ctx.client
+      .from("opname")
+      .select("id,location_id,date")
+      .eq("id", id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (!opname.data) return { error: "BA opname tidak ditemukan." };
+    const { error } = await ctx.client
+      .from("opname")
+      .update({ deleted_at: new Date().toISOString(), delete_reason: reason })
+      .eq("id", id);
+    if (error) return { error: error.message };
+    await rebuildLocal(opname.data.location_id, opname.data.date);
+    refresh(["/fisik", "/", "/rekon"]);
+    return done("BA opname dibatalkan. Posisi dibangun ulang dari tanggal opname.");
   } catch (error) {
     return fail(error);
   }
