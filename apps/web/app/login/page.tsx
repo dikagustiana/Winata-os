@@ -3,6 +3,8 @@ import { getViewer } from "@/lib/session";
 import { isMockAuth } from "@/lib/supabase/server";
 import { LoginForm } from "./LoginForm";
 
+export const dynamic = "force-dynamic";
+
 export default async function LoginPage() {
   const viewer = await getViewer();
   if (viewer) redirect("/");

@@ -33,6 +33,7 @@ pnpm typecheck
 pnpm test        # vitest + PGlite (semua migrasi dijalankan dari nol)
 pnpm e2e         # Playwright; server dev di 127.0.0.1:3100 dengan MOCK_AUTH=1
 pnpm lint
+pnpm build       # build produksi Next.js (butuh env Supabase hanya saat runtime cloud)
 ```
 
 Menjalankan aplikasi:

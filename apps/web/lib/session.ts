@@ -18,6 +18,7 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     email = store.get("mock_user")?.value?.toLowerCase() ?? null;
     if (!email) return null;
   } else {
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
     const supabase = await getAuthClient();
     const { data } = await supabase.auth.getUser();
     appUserId = data.user?.id ?? null;
