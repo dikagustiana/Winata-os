@@ -4,7 +4,7 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -30,11 +30,28 @@ const child = spawn(process.execPath, [nextBin, "dev", "-p", "3100"], {
   },
 });
 
-function shutdown(signal) {
-  child.kill(signal);
-  setTimeout(() => process.exit(0), 500).unref();
+let stopped = false;
+
+function stopChild() {
+  if (stopped) return;
+  stopped = true;
+  if (!child.pid) return;
+  if (process.platform === "win32") {
+    spawnSync("taskkill", ["/pid", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+  } else {
+    child.kill("SIGTERM");
+  }
 }
 
-process.on("SIGINT", () => shutdown("SIGINT"));
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-child.on("exit", (code) => process.exit(code ?? 0));
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {
+  process.on(signal, () => {
+    stopChild();
+    process.exit(0);
+  });
+}
+process.on("exit", stopChild);
+
+child.on("exit", (code) => {
+  stopped = true;
+  process.exit(code ?? 0);
+});

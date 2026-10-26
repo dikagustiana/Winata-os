@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { addDays, card, login, todayJakarta, USERS } from "./helpers";
+import { addDays, card, dateShort, login, todayJakarta, USERS } from "./helpers";
 
 test.describe("T-29 journey A: submit → approve → lock → koreksi", () => {
   // eslint-disable-next-line no-empty-pattern
@@ -19,16 +19,16 @@ test.describe("T-29 journey A: submit → approve → lock → koreksi", () => {
     await context.clearCookies();
     await login(page, USERS.manager);
     await page.goto("/approve");
-    const approvalCard = page.locator("section").filter({ hasText: `SLP · ` }).filter({ hasText: date.slice(8) }).first();
+    const approvalCard = page.locator("section").filter({ hasText: `SLP · ` }).filter({ hasText: dateShort(date) }).first();
     await approvalCard.getByRole("button", { name: "Setujui" }).click();
     await expect(page.getByText("Tidak ada hari yang menunggu persetujuan.")).toBeVisible();
 
     await context.clearCookies();
     await login(page, USERS.accounting);
     await page.goto("/rekon?tab=kunci");
-    const lockRow = page.locator("tr").filter({ hasText: "SLP" }).filter({ hasText: date.slice(8) }).first();
+    const lockRow = page.locator("tr").filter({ hasText: "SLP" }).filter({ hasText: dateShort(date) }).first();
     await lockRow.getByRole("button", { name: "Kunci" }).click();
-    await expect(card(page, "Hari terkunci").locator("tr").filter({ hasText: date.slice(8) }).first()).toBeVisible();
+    await expect(card(page, "Hari terkunci").locator("tr").filter({ hasText: dateShort(date) }).first()).toBeVisible();
 
     // Kandang tidak bisa mengubah hari terkunci.
     await context.clearCookies();

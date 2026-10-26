@@ -1,5 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
-import { addDays, card, login, todayJakarta, USERS } from "./helpers";
+import { addDays, card, dateShort, login, todayJakarta, USERS } from "./helpers";
 
 async function draftExists(page: Page, key: string): Promise<boolean> {
   return page.evaluate(async (storageKey) => {
@@ -73,7 +73,7 @@ test.describe("T-28 offline draft (K8)", () => {
     const approvalCard = manager.page
       .locator("section")
       .filter({ hasText: "SLP ·" })
-      .filter({ hasText: date.slice(8) })
+      .filter({ hasText: dateShort(date) })
       .first();
     await approvalCard.getByRole("button", { name: "Setujui" }).click();
     await expect(approvalCard).toHaveCount(0);

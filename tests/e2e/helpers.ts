@@ -34,6 +34,13 @@ export function todayJakarta(): string {
   }).format(new Date());
 }
 
+const MONTHS = ["Jan","Feb","Mar","Apr","Mei","Jun","Jul","Agu","Sep","Okt","Nov","Des"];
+
+export function dateShort(iso: string): string {
+  const [, month, day] = iso.split("-");
+  return `${Number(day)} ${MONTHS[Number(month) - 1]}`;
+}
+
 export function addDays(iso: string, days: number): string {
   const date = new Date(`${iso}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + days);
