@@ -1,4 +1,4 @@
-import type { PGlite } from "@electric-sql/pglite";
+import type { Queryable } from "./queryable";
 import {
   addDays,
   buildProjection,
@@ -26,7 +26,7 @@ interface FlockRecord {
  * R-32: proyeksi produksi 28 hari disimpan di projection_daily oleh worker,
  * supaya halaman outlook tidak menghitung sendiri (R-15).
  */
-export async function refreshProjection(db: PGlite, startDate?: string, days = 28): Promise<number> {
+export async function refreshProjection(db: Queryable, startDate?: string, days = 28): Promise<number> {
   const start = startDate ?? addDays(todayJakarta(), 1);
   const end = addDays(start, days - 1);
 

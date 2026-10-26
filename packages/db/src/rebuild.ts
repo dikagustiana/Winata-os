@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { PGlite } from "@electric-sql/pglite";
+import type { Queryable } from "./queryable";
 import {
   D,
   computePosition,
@@ -32,7 +32,7 @@ export function parseParameter(value: unknown): unknown {
   return value;
 }
 
-export async function getParameter<T = unknown>(db: PGlite, key: string, fallback?: T): Promise<T> {
+export async function getParameter<T = unknown>(db: Queryable, key: string, fallback?: T): Promise<T> {
   const result = await db.query<{ value: unknown }>(
     `select value from parameter
       where key = $1 and deleted_at is null and valid_from <= current_date
@@ -66,7 +66,7 @@ interface DataBundle {
   anchorDate: string;
 }
 
-async function loadData(db: PGlite, toDate: string, anchorOverride?: string): Promise<DataBundle> {
+async function loadData(db: Queryable, toDate: string, anchorOverride?: string): Promise<DataBundle> {
   const locationsResult = await db.query<{ id: string; code: string; kind: "kandang" | "gudang" }>(
     `select id, code, kind from location where active and deleted_at is null order by code`,
   );
@@ -98,7 +98,7 @@ async function loadData(db: PGlite, toDate: string, anchorOverride?: string): Pr
     .filter((r) => anchorByLocation.get(r.location_id) === r.date)
     .map((r) => ({ locationId: r.location_id, gradeId: r.grade_id, kg: r.kg }));
 
-  const productionResult = await db.query(
+  const productionResult = await db.query<ProductionTxn>(
     `select location_id as "locationId", grade_id as "gradeId", date, sum(kg) as kg
        from production
       where deleted_at is null and date between $1 and $2
@@ -106,7 +106,7 @@ async function loadData(db: PGlite, toDate: string, anchorOverride?: string): Pr
     [anchorDate, toDate],
   );
 
-  const outboundResult = await db.query(
+  const outboundResult = await db.query<OutboundTxn>(
     `select o.location_id as "locationId", ol.grade_id as "gradeId", o.date,
             sum(coalesce(ol.kg_delivered, ol.kg_doc)) as kg
        from outbound o
@@ -118,7 +118,7 @@ async function loadData(db: PGlite, toDate: string, anchorOverride?: string): Pr
     [anchorDate, toDate],
   );
 
-  const transferResult = await db.query(
+  const transferResult = await db.query<Omit<TransferTxn, "kg"> & { kg: string }>(
     `select id, from_location_id as "fromLocationId", to_location_id as "toLocationId",
             grade_id as "gradeId", kg, sent_date as "sentDate",
             received_date as "receivedDate", status
@@ -127,7 +127,7 @@ async function loadData(db: PGlite, toDate: string, anchorOverride?: string): Pr
     [anchorDate, toDate],
   );
 
-  const shrinkageResult = await db.query(
+  const shrinkageResult = await db.query<ShrinkageTxn>(
     `select location_id as "locationId", grade_id as "gradeId", date, sum(kg) as kg
        from shrinkage
       where deleted_at is null and date between $1 and $2
@@ -135,7 +135,7 @@ async function loadData(db: PGlite, toDate: string, anchorOverride?: string): Pr
     [anchorDate, toDate],
   );
 
-  const correctionResult = await db.query(
+  const correctionResult = await db.query<CorrectionTxn>(
     `select location_id as "locationId", grade_id as "gradeId",
             effective_date as "effectiveDate", kg, status
        from correction
@@ -156,14 +156,14 @@ async function loadData(db: PGlite, toDate: string, anchorOverride?: string): Pr
       endDate: toDate,
       openingDate: anchorDate,
       opening,
-      production: productionResult.rows as ProductionTxn[],
-      outbound: outboundResult.rows as OutboundTxn[],
+      production: productionResult.rows,
+      outbound: outboundResult.rows,
       transfer: (transferResult.rows as Array<Omit<TransferTxn, "kg"> & { kg: string }>).map((t) => ({
         ...t,
         kg: t.kg,
       })) as TransferTxn[],
-      shrinkage: shrinkageResult.rows as ShrinkageTxn[],
-      correction: correctionResult.rows as CorrectionTxn[],
+      shrinkage: shrinkageResult.rows,
+      correction: correctionResult.rows,
       hppPerKg: hpp,
       bucketDays: Array.isArray(buckets) && buckets.length === 3
         ? [Number(buckets[0]), Number(buckets[1]), Number(buckets[2])]
@@ -189,7 +189,7 @@ function hashInputs(input: ComputePositionInput): string {
     .slice(0, 32);
 }
 
-async function writeRows(db: PGlite, rows: PositionRow[], hash: string): Promise<number> {
+async function writeRows(db: Queryable, rows: PositionRow[], hash: string): Promise<number> {
   if (rows.length === 0) return 0;
   const chunkSize = 150;
   let written = 0;
@@ -243,7 +243,7 @@ async function writeRows(db: PGlite, rows: PositionRow[], hash: string): Promise
  * R-15: membangun ulang position_daily. Perhitungan selalu dimulai dari jangkar
  * agar FIFO/aging tepat; hanya tanggal >= fromDate yang ditulis (R-15/R-16).
  */
-export async function rebuildPositions(db: PGlite, options: RebuildOptions = {}): Promise<RebuildResult> {
+export async function rebuildPositions(db: Queryable, options: RebuildOptions = {}): Promise<RebuildResult> {
   const toDate = options.toDate ?? todayJakarta();
   const { input, anchorDate } = await loadData(db, toDate, options.anchorDate);
   const fromDate = options.fromDate ?? anchorDate;
@@ -268,7 +268,7 @@ export async function rebuildPositions(db: PGlite, options: RebuildOptions = {})
 }
 
 /** Bangun ulang seluruh lokasi (dipakai saat inisialisasi DB lokal). */
-export async function rebuildAll(db: PGlite, toDate?: string): Promise<RebuildResult> {
+export async function rebuildAll(db: Queryable, toDate?: string): Promise<RebuildResult> {
   const result = await db.query<{ count: string }>(
     `select count(*)::text as count from position_daily`,
   );
@@ -285,10 +285,11 @@ export interface ProcessedRebuild {
 /**
  * Worker: klaim antrean secara atomik, bangun ulang per lokasi, tandai selesai.
  * Dua pemanggil bersamaan tidak membangun lokasi yang sama (claim_rebuild).
+ * Berjalan di PGlite (lokal/tes) dan pg cloud lewat Queryable (K17).
  */
-export async function processRebuildQueue(db: PGlite, limit = 5): Promise<ProcessedRebuild[]> {
-  const claimed = await db.query<{ location_id: string; from_date: string }>(
-    `select location_id, from_date from claim_rebuild($1)`,
+export async function processRebuildQueue(db: Queryable, limit = 5): Promise<ProcessedRebuild[]> {
+  const claimed = await db.query<{ location_id: string; from_date: string; generation: string | number }>(
+    `select location_id, from_date, generation from claim_rebuild($1)`,
     [limit],
   );
   const processed: ProcessedRebuild[] = [];
@@ -297,14 +298,16 @@ export async function processRebuildQueue(db: PGlite, limit = 5): Promise<Proces
       locationIds: [row.location_id],
       fromDate: row.from_date,
     });
-    await db.query(`select mark_rebuild_done($1)`, [row.location_id]);
+    // R-65: hanya 'done' bila tidak ada enqueue baru selama rebuild berjalan;
+    // selain itu baris kembali 'queued' dengan from_date terkecil.
+    await db.query(`select mark_rebuild_done($1::uuid, $2::bigint)`, [row.location_id, String(row.generation)]);
     processed.push({ locationId: row.location_id, fromDate: row.from_date, rowsWritten: result.rowsWritten });
   }
   return processed;
 }
 
 /** Untuk tes/aksi: antre lalu langsung proses (inline <= 7 tanggal). */
-export async function rebuildLocationFrom(db: PGlite, locationId: string, fromDate: string): Promise<RebuildResult> {
+export async function rebuildLocationFrom(db: Queryable, locationId: string, fromDate: string): Promise<RebuildResult> {
   await db.query(`select enqueue_rebuild($1, $2)`, [locationId, fromDate]);
   return rebuildPositions(db, { locationIds: [locationId], fromDate });
 }

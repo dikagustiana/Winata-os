@@ -16,6 +16,7 @@ jobs:
     env:
       CRON_SECRET: ci-secret
       NEXT_TELEMETRY_DISABLED: "1"
+      MOCK_AUTH_ALLOW_PRODUCTION_BUILD: "1"
     steps:
       - uses: actions/checkout@v4
 
