@@ -100,6 +100,13 @@ Pendaftaran mandiri ditolak trigger; admin membuat akun di `/admin`.
 - BA dicetak lewat dialog browser (belum generator PDF).
 - HPP selalu "HPP sementara" sampai costing flok ada (v1).
 
+## Serah terima
+
+Pekerjaan lanjutan untuk tahap cloud ada di
+[docs/HANDOVER-CLAUDE.md](docs/HANDOVER-CLAUDE.md): review, Supabase staging/production,
+worker cloud (Q-11), Auth/Storage, cron, impor BA T0, backup, dan checklist verifikasi.
+Branch pengiriman: `m0-m6-full`.
+
 ## Lisensi / kepemilikan
 
 Repo privat PT Winata Mega Agro. Jangan menyimpan kunci cloud di repo; `.env.example`

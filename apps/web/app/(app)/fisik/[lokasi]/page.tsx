@@ -10,6 +10,7 @@ import { DataTable } from "@/components/ui/DataTable";
 import { ActionForm } from "@/components/ui/ActionForm";
 
 import { EstimateTag, StatusChip } from "@/components/ui/StatusChip";
+import { signedUrl } from "@/lib/storage";
 import { PhysicalForm, type GradeConversion } from "@/components/fisik/PhysicalForm";
 import {
   markCheckedAction,
@@ -128,6 +129,9 @@ export default async function FisikPage({
   const signed = opname?.status === "signed";
   const disabled = signed;
   const photos = (opname?.photo_note ?? "").split(";").filter(Boolean);
+  const photoLinks = await Promise.all(
+    photos.map(async (photo) => ({ path: photo, url: await signedUrl("ba-photos", photo) })),
+  );
 
   return (
     <>
@@ -272,14 +276,11 @@ export default async function FisikPage({
           <h3 className="card-title" style={{ fontSize: 14 }}>Foto BA</h3>
           {photos.length === 0 ? <p className="small muted">Belum ada foto.</p> : null}
           <div className="pill-list">
-            {photos.map((photo) => {
-              const relative = photo.replace(/^ba-photos\//, "");
-              return (
-                <a key={photo} href={`/api/storage/ba-photos/${relative}`} target="_blank" rel="noreferrer" className="btn btn-sm">
-                  Foto
-                </a>
-              );
-            })}
+            {photoLinks.map(({ path, url }) => (
+              <a key={path} href={url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-sm">
+                Foto
+              </a>
+            ))}
           </div>
           <div style={{ marginTop: 8 }}>
             <ActionForm action={uploadBaPhotoAction} submitLabel="Unggah foto">

@@ -30,7 +30,26 @@ export async function createUserAction(_prev: ActionState, form: FormData): Prom
       .maybeSingle();
     if (existing) return { error: "E-mail sudah terdaftar." };
 
-    const id = crypto.randomUUID();
+    // Di cloud, app_user.id HARUS sama dengan auth.users.id agar auth.uid()
+    // cocok dengan policy RLS. Karena itu akun Auth dibuat lebih dulu.
+    let authUserId: string | null = null;
+    if (!isMockAuth()) {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+      const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+      const admin = createClient(url, key, { auth: { persistSession: false } });
+      const { data: created, error: authError } = await admin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { name, role },
+      });
+      if (authError || !created.user) {
+        return { error: `Gagal membuat akun login: ${authError?.message ?? "pengguna tidak dikembalikan"}` };
+      }
+      authUserId = created.user.id;
+    }
+
+    const id = authUserId ?? crypto.randomUUID();
     const { error } = await ctx.client
       .from("app_user")
       .insert({ id, email, name, role, active: true, created_by: ctx.viewer.id });
@@ -40,17 +59,6 @@ export async function createUserAction(_prev: ActionState, form: FormData): Prom
       const { getLocalDb } = await import("@/lib/local-db");
       const db = await getLocalDb();
       await db.query(`select set_login_password($1, $2)`, [email, password]);
-    } else {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-      const admin = createClient(url, key, { auth: { persistSession: false } });
-      const { error: authError } = await admin.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: { name, role },
-      });
-      if (authError) return { error: `Akun aplikasi dibuat, tetapi login gagal: ${authError.message}` };
     }
 
     refresh(["/admin", "/master"]);

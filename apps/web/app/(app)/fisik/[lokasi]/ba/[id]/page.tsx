@@ -4,6 +4,7 @@ import type { GradeRow, LocationRow, OpnameLineRow, OpnameRow } from "@winata/db
 import { requireRole } from "@/lib/session";
 import { viewerClient } from "@/lib/data";
 import { getServiceClient } from "@/lib/supabase/server";
+import { signedUrl } from "@/lib/storage";
 import { fmtDate, fmtDateTime, fmtKg, fmtTime } from "@/lib/format";
 import { Card } from "@/components/ui/Card";
 import { PrintButton } from "@/components/ui/PrintButton";
@@ -38,6 +39,9 @@ export default async function BaPage({ params }: { params: Promise<{ lokasi: str
 
   const totalKg = lines.reduce((acc, line) => acc + Number(line.kg), 0);
   const photos = (opname.photo_note ?? "").split(";").filter(Boolean);
+  const photoLinks = await Promise.all(
+    photos.map(async (photo) => ({ path: photo, url: await signedUrl("ba-photos", photo) })),
+  );
 
   return (
     <div className="stack">
@@ -123,14 +127,11 @@ export default async function BaPage({ params }: { params: Promise<{ lokasi: str
           <div style={{ marginTop: 16 }}>
             <div className="label">Foto</div>
             <div className="pill-list">
-              {photos.map((photo) => {
-                const relative = photo.replace(/^ba-photos\//, "");
-                return (
-                  <a key={photo} href={`/api/storage/ba-photos/${relative}`} target="_blank" rel="noreferrer" className="btn btn-sm">
-                    Foto
-                  </a>
-                );
-              })}
+              {photoLinks.map(({ path, url }) => (
+                <a key={path} href={url ?? "#"} target="_blank" rel="noreferrer" className="btn btn-sm">
+                  Foto
+                </a>
+              ))}
             </div>
           </div>
         ) : null}
