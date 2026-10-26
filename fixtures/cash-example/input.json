@@ -1,0 +1,239 @@
+{
+  "startWeek": "2026-10-26",
+  "startBalance": 250000000,
+  "revenue": [
+    {
+      "weekStart": "2026-11-02",
+      "customerKind": "bakul",
+      "amountRp": 300000000
+    },
+    {
+      "weekStart": "2026-11-02",
+      "customerKind": "agen",
+      "amountRp": 420000000
+    },
+    {
+      "weekStart": "2026-11-02",
+      "customerKind": "grup",
+      "amountRp": 240000000
+    },
+    {
+      "weekStart": "2026-11-09",
+      "customerKind": "bakul",
+      "amountRp": 300000000
+    },
+    {
+      "weekStart": "2026-11-09",
+      "customerKind": "agen",
+      "amountRp": 420000000
+    },
+    {
+      "weekStart": "2026-11-09",
+      "customerKind": "grup",
+      "amountRp": 240000000
+    },
+    {
+      "weekStart": "2026-11-16",
+      "customerKind": "bakul",
+      "amountRp": 300000000
+    },
+    {
+      "weekStart": "2026-11-16",
+      "customerKind": "agen",
+      "amountRp": 420000000
+    },
+    {
+      "weekStart": "2026-11-16",
+      "customerKind": "grup",
+      "amountRp": 240000000
+    }
+  ],
+  "cashPlan": [
+    {
+      "weekStart": "2026-10-26",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-10-26",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-11-02",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-11-02",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-11-09",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-11-09",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-11-16",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-11-16",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-11-23",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-11-23",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-11-30",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-11-30",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-12-07",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-12-07",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-12-14",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-12-14",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-12-21",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-12-21",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-12-28",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2026-12-28",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2027-01-04",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2027-01-04",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2027-01-11",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2027-01-11",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2027-01-18",
+      "category": "pakan",
+      "direction": "out",
+      "amountRp": 180000000
+    },
+    {
+      "weekStart": "2027-01-18",
+      "category": "gaji",
+      "direction": "out",
+      "amountRp": 62000000
+    },
+    {
+      "weekStart": "2026-11-02",
+      "category": "angsuran Mandiri",
+      "direction": "out",
+      "amountRp": 95000000
+    },
+    {
+      "weekStart": "2026-10-26",
+      "category": "saldo awal lain",
+      "direction": "in",
+      "amountRp": 10000000
+    }
+  ],
+  "profile": {
+    "bakul": [
+      1
+    ],
+    "agen": [
+      0.5,
+      0.5
+    ],
+    "grup": [
+      0,
+      0,
+      1
+    ],
+    "lain": [
+      1
+    ]
+  },
+  "weeks": 13
+}

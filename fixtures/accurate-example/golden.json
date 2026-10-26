@@ -1,0 +1,42 @@
+{
+  "note": "Fixture sintetis mengikuti kolom ekspor Accurate. Pemilik mengganti dengan ekspor asli.",
+  "sales": {
+    "rows": 6,
+    "totalKg": 3031,
+    "totalRp": 73659000,
+    "itemCodes": [
+      "EGG-UB",
+      "EGG-US",
+      "EGG-UK",
+      "EGG-RT",
+      "EGG-PC"
+    ]
+  },
+  "stock": {
+    "rows": 5,
+    "totalKg": 4521,
+    "totalRp": 78742300
+  },
+  "itemMap": [
+    {
+      "code": "EGG-UB",
+      "grade": "33333333-3333-3333-3333-333333333301"
+    },
+    {
+      "code": "EGG-US",
+      "grade": "33333333-3333-3333-3333-333333333302"
+    },
+    {
+      "code": "EGG-UK",
+      "grade": "33333333-3333-3333-3333-333333333303"
+    },
+    {
+      "code": "EGG-RT",
+      "grade": "33333333-3333-3333-3333-333333333304"
+    },
+    {
+      "code": "EGG-PC",
+      "grade": "33333333-3333-3333-3333-333333333305"
+    }
+  ]
+}
