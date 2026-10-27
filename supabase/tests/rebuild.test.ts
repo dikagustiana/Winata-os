@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PGlite } from "@electric-sql/pglite";
 import { asService, createTestDb } from "../../packages/db/test/pglite";
-import { processRebuildQueue, rebuildAll, rebuildPositions } from "@winata/db";
+import { processRebuildQueue, rebuildAll, rebuildPositions, rollForward } from "@winata/db";
 
 const SLP = "11111111-1111-1111-1111-111111111101";
 const TSK = "11111111-1111-1111-1111-111111111103";
@@ -148,5 +148,31 @@ describe("T-16 rebuild hanya dari tanggal yang berubah + klaim atomik", () => {
     const processed = await processRebuildQueue(db, 1);
     expect(processed).toHaveLength(1);
     expect(processed[0].rowsWritten).toBeGreaterThan(0);
+  });
+});
+
+describe("rollForward: posisi sampai hari ini tanpa transaksi baru", () => {
+  it("mengisi hanya tanggal yang hilang, angkanya sama dengan rebuild penuh, lalu idempoten", async () => {
+    await q(`delete from position_daily`);
+    await rebuildPositions(db, { toDate: "2026-10-26" });
+    const full = await q(`select * from position_daily order by location_id, grade_id, date`);
+
+    await q(`delete from position_daily where date > '2026-10-20'`);
+    const result = await rollForward(db, "2026-10-26");
+    expect(result?.fromDate).toBe("2026-10-21");
+    expect(result?.toDate).toBe("2026-10-26");
+    const rolled = await q(`select * from position_daily order by location_id, grade_id, date`);
+    const strip = (rows: Record<string, unknown>[]) => rows.map(({ id: _i, computed_at: _c, inputs_hash: _h, ...rest }) => rest);
+    expect(strip(rolled)).toEqual(strip(full));
+
+    expect(await rollForward(db, "2026-10-26")).toBeNull();
+  });
+
+  it("tabel kosong dibangun penuh dari jangkar T0", async () => {
+    await q(`delete from position_daily`);
+    const result = await rollForward(db, "2026-10-26");
+    expect(result?.fromDate).toBe("2026-07-01");
+    const row = await position(SLP, "2026-10-26");
+    expect(row).toBeDefined();
   });
 });
