@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getWorkerDb } from "@/lib/cloud-db";
 import { cronFailure, cronGuard, isoDateParam } from "@/lib/cron";
-import { processControls, processRebuildQueue, rebuildPositions, refreshProjection, todayJakarta } from "@winata/db";
+import { processControls, processRebuildQueue, rebuildPositions, refreshProjection, rollForward, todayJakarta } from "@winata/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,7 +12,7 @@ const LOCATIONS_PER_RUN = 10;
 
 /**
  * GET /api/cron/rebuild — tiap jam (vercel.json):
- * antrean rebuild → proyeksi 28 hari → kontrol hari ini.
+ * antrean rebuild → isi posisi sampai hari ini → proyeksi 28 hari → kontrol hari ini.
  * Bootstrap sekali sesudah BA T0 diimpor: ?full=1&from=YYYY-MM-DD membangun
  * ulang semua lokasi dari tanggal itu.
  */
@@ -35,6 +35,7 @@ export async function GET(request: Request) {
     }
 
     const processed = await processRebuildQueue(db, LOCATIONS_PER_RUN);
+    const rolled = await rollForward(db);
     const projected = await refreshProjection(db);
     const controls = await processControls(db, date);
     return NextResponse.json({
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
       bootstrap,
       rebuilt: processed.length,
       processed,
+      rolledForward: rolled && { fromDate: rolled.fromDate, toDate: rolled.toDate, rowsWritten: rolled.rowsWritten },
       projectionRows: projected,
       controls: controls.length,
     });
