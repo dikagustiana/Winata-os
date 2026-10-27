@@ -64,5 +64,10 @@ insert into parameter (key, value, valid_from, note) values
   ('tb_egg_whole_rp', '383582877'::jsonb, '2026-07-01', 'R-43 TB telur utuh'),
   ('tb_egg_broken_rp', '6209446'::jsonb, '2026-07-01', 'R-43 TB telur pecah'),
   ('tb_hpp_per_kg', '17419'::jsonb, '2026-07-01', 'R-43 HPP sementara'),
-  ('reconstruction_target_date', '"2026-06-30"'::jsonb, '2026-07-01', 'R-43')
+  ('reconstruction_target_date', '"2026-06-30"'::jsonb, '2026-07-01', 'R-43'),
+  -- v1.1 (R-70, R-71, R-73); default sampai dikonfirmasi pemilik (Q-21, Q-22).
+  ('tb_total_rp', '389792323'::jsonb, '2026-07-01', 'Nilai buku pembanding rekonstruksi = 383.582.877 + 6.209.446 (Q-21)'),
+  ('coa_inventory_egg', '"<isi dari CoA Winata> Persediaan Telur"'::jsonb, '2026-07-01', 'Akun jurnal persediaan telur (Q-22)'),
+  ('coa_inventory_variance', '"<isi dari CoA Winata> Selisih Persediaan (Pending RS-05)"'::jsonb, '2026-07-01', 'Akun jurnal selisih persediaan (Q-22)'),
+  ('reconstruct_missing_basis', '{"production":"june_avg","outbound":"period_avg"}'::jsonb, '2026-07-01', 'Basis estimasi hari bolong rekonstruksi')
 on conflict do nothing;

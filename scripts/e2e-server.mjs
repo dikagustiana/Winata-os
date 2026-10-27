@@ -22,6 +22,8 @@ const child = spawn(process.execPath, [nextBin, "dev", "-p", "3100"], {
   env: {
     ...process.env,
     MOCK_AUTH: "1",
+    // K15: mock hanya di luar Vercel; izinkan bila server e2e dijalankan sebagai build produksi.
+    MOCK_AUTH_ALLOW_PRODUCTION_BUILD: "1",
     LOCAL_DB_DIR: ".local-db-e2e",
     WINATA_REPO_ROOT: root,
     CRON_SECRET: "e2e-secret",

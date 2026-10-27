@@ -1,9 +1,9 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { AppRole, DataClient, Viewer } from "@winata/db";
-import { getLocalDb } from "@/lib/local-db";
+import { getWorkerDb } from "@/lib/cloud-db";
+import { isMockAuth } from "@/lib/mock-mode";
 import { requireViewer } from "@/lib/session";
-import { getServiceClient, isMockAuth } from "@/lib/supabase/server";
 import { parseIdNumber, requireNumber } from "@/lib/format";
 import { viewerClient } from "@/lib/data";
 import type { ActionState } from "@/lib/action-types";
@@ -11,7 +11,6 @@ import type { ActionState } from "@/lib/action-types";
 export interface ActionContext {
   viewer: Viewer;
   client: DataClient;
-  service: DataClient;
 }
 
 /** Semua aksi memakai klien pengguna sehingga RLS tetap berlaku. */
@@ -21,8 +20,7 @@ export async function actionContext(roles?: AppRole[]): Promise<ActionContext | 
     return { error: "Peran Anda tidak berhak melakukan tindakan ini." };
   }
   const client = await viewerClient(viewer);
-  const service = await getServiceClient();
-  return { viewer, client, service };
+  return { viewer, client };
 }
 
 export function isActionState(value: ActionContext | ActionState): value is ActionState {
@@ -94,19 +92,30 @@ export function done(message: string): ActionState {
   return { ok: true, message };
 }
 
-/** Bangun ulang posisi lokal setelah perubahan (worker inline). */
+/** Batas rebuild inline di aksi (R-74); lebih lama diserahkan ke antrean + cron. */
+export const INLINE_REBUILD_MAX_DAYS = 7;
+
+/**
+ * Worker inline setelah perubahan (R-74): bangun ulang posisi lokasi dari
+ * tanggal yang berubah (cloud: bila ≤ 7 hari ke belakang), lalu proyeksi dan kontrol.
+ * Lokal memakai PGlite, cloud memakai pg (Queryable yang sama). Galat worker
+ * tidak menggagalkan aksi: data sudah tersimpan dan antrean (trigger) menjamin
+ * cron membangun ulang.
+ */
 export async function rebuildLocal(locationId: string, fromDate: string): Promise<void> {
-  if (!isMockAuth()) return;
   try {
+    const { diffDays } = await import("@winata/engine");
     const { rebuildPositions, processControls, refreshProjection, todayJakarta } = await import("@winata/db");
-    const db = await getLocalDb();
+    const today = todayJakarta();
+    // Lokal (mock) tidak punya cron: selalu inline seperti v1.
+    if (!isMockAuth() && diffDays(fromDate, today) > INLINE_REBUILD_MAX_DAYS) return;
+    const db = await getWorkerDb();
     await rebuildPositions(db, { locationIds: [locationId], fromDate });
     await refreshProjection(db);
     await processControls(db, fromDate);
-    const today = todayJakarta();
     if (today !== fromDate) await processControls(db, today);
   } catch (error) {
-    console.error("rebuild gagal", error);
+    console.error("rebuild inline gagal", error);
   }
 }
 

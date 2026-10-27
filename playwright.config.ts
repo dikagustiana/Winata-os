@@ -13,6 +13,8 @@ export default defineConfig({
     trace: "retain-on-failure",
     locale: "id-ID",
     timezoneId: "Asia/Jakarta",
+    // Lingkungan tanpa unduhan browser: arahkan ke Chromium yang sudah terpasang.
+    launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
   projects: [
     {

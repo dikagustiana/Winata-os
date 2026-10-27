@@ -12,6 +12,7 @@
       "@winata/engine/*": ["../../packages/engine/src/*"],
       "@winata/db": ["../../packages/db/src/index.ts"],
       "@winata/db/local": ["../../packages/db/src/local-client.ts"],
+      "@winata/db/cloud": ["../../packages/db/src/pg-cloud.ts"],
       "@winata/parsers": ["../../packages/parsers/src/index.ts"]
     },
     "plugins": [{ "name": "next" }]

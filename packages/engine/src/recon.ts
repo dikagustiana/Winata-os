@@ -136,14 +136,27 @@ export interface CorrectionEntry {
 
 export interface CorrectionProposal {
   entries: CorrectionEntry[];
+  /** false selama akun masih nilai default parameter (belum dikonfirmasi CoA). */
+  accountsConfirmed: boolean;
   totalDebit: string;
   totalCredit: string;
   diffRp: string;
   balanced: boolean;
 }
 
+/** Nilai default parameter akun (R-71); diganti pemilik dengan CoA Winata. */
+export const DEFAULT_COA_INVENTORY_EGG = "<isi dari CoA Winata> Persediaan Telur";
+export const DEFAULT_COA_INVENTORY_VARIANCE = "<isi dari CoA Winata> Selisih Persediaan (Pending RS-05)";
+
+/** Akun dianggap terkonfirmasi bila terisi dan bukan placeholder default. */
+export function isAccountConfirmed(account: string | null | undefined): boolean {
+  const value = (account ?? "").trim();
+  return value !== "" && !value.startsWith("<isi");
+}
+
 /**
  * R-43/T-62: draft Usulan Koreksi seimbang (Dr = Cr) dengan referensi RS-05.
+ * R-71: akun dari parameter coa_inventory_egg / coa_inventory_variance.
  * Bila nilai buku (TB) lebih besar dari hasil rekonstruksi, persediaan dikreditkan.
  */
 export function buildCorrectionProposal(input: {
@@ -151,8 +164,11 @@ export function buildCorrectionProposal(input: {
   hppPerKg: string | number;
   bookValueRp: string | number;
   reference?: string;
+  accounts?: { inventory?: string | null; variance?: string | null };
 }): CorrectionProposal {
   const reference = input.reference ?? "RS-05";
+  const inventoryAccount = input.accounts?.inventory?.trim() || DEFAULT_COA_INVENTORY_EGG;
+  const varianceAccount = input.accounts?.variance?.trim() || DEFAULT_COA_INVENTORY_VARIANCE;
   const hpp = D(input.hppPerKg);
   const physicalValue = input.rows.reduce(
     (acc, row) => acc.plus(row.valueRp !== undefined ? D(row.valueRp) : D(row.kg).times(hpp)),
@@ -165,11 +181,11 @@ export function buildCorrectionProposal(input: {
   const entries: CorrectionEntry[] = [];
   if (amount.greaterThan(0)) {
     if (diff.greaterThan(0)) {
-      entries.push({ account: "5-2100 Selisih Persediaan (Pending " + reference + ")", memo: reference, debit: amount.toFixed(2), credit: "0.00" });
-      entries.push({ account: "1-1300 Persediaan Telur", memo: reference, debit: "0.00", credit: amount.toFixed(2) });
+      entries.push({ account: varianceAccount, memo: reference, debit: amount.toFixed(2), credit: "0.00" });
+      entries.push({ account: inventoryAccount, memo: reference, debit: "0.00", credit: amount.toFixed(2) });
     } else {
-      entries.push({ account: "1-1300 Persediaan Telur", memo: reference, debit: amount.toFixed(2), credit: "0.00" });
-      entries.push({ account: "5-2100 Selisih Persediaan (Pending " + reference + ")", memo: reference, debit: "0.00", credit: amount.toFixed(2) });
+      entries.push({ account: inventoryAccount, memo: reference, debit: amount.toFixed(2), credit: "0.00" });
+      entries.push({ account: varianceAccount, memo: reference, debit: "0.00", credit: amount.toFixed(2) });
     }
   }
 
@@ -177,6 +193,7 @@ export function buildCorrectionProposal(input: {
   const totalCredit = entries.reduce((acc, entry) => acc.plus(D(entry.credit)), new Decimal(0));
   return {
     entries,
+    accountsConfirmed: isAccountConfirmed(inventoryAccount) && isAccountConfirmed(varianceAccount),
     totalDebit: totalDebit.toFixed(2),
     totalCredit: totalCredit.toFixed(2),
     diffRp: diff.toFixed(2),

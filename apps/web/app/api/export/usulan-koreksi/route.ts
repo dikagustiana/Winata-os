@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { getViewer } from "@/lib/session";
-import { loadParameters, paramNumber, viewerClient } from "@/lib/data";
-import { computeReconstruction } from "@/lib/recon";
+import { loadParameters, viewerClient } from "@/lib/data";
+import { computeReconstruction, reconstructionSettings } from "@/lib/recon";
 
 export const dynamic = "force-dynamic";
 
@@ -15,13 +15,11 @@ export async function GET(request: Request) {
   const t0 = url.searchParams.get("t0") ?? "2026-07-01";
   const client = await viewerClient(viewer);
   const params = await loadParameters(client, t0);
-  const hpp = String(paramNumber(params, "hpp_per_kg", 17419));
-  const bookDefault = String(
-    paramNumber(params, "tb_egg_whole_rp", 383582877) + paramNumber(params, "tb_egg_broken_rp", 6209446),
-  );
-  const book = url.searchParams.get("book") ?? bookDefault;
+  const settings = reconstructionSettings(params);
+  const hpp = String(settings.hppPerKg);
+  const book = url.searchParams.get("book") ?? String(settings.bookValueRp);
 
-  const result = await computeReconstruction(client, target, t0, book, hpp);
+  const result = await computeReconstruction(client, target, t0, book, hpp, settings);
   if ("error" in result) return new Response(result.error, { status: 400 });
 
   const workbook = new ExcelJS.Workbook();
@@ -70,6 +68,9 @@ export async function GET(request: Request) {
     Number(result.proposal.totalCredit),
   ]);
   balanced.font = { bold: true };
+  if (!result.proposal.accountsConfirmed) {
+    sheet.addRow(["Akun belum dikonfirmasi: isi parameter coa_inventory_egg dan coa_inventory_variance di Admin."]);
+  }
 
   sheet.getColumn(1).width = 12;
   sheet.getColumn(2).width = 28;

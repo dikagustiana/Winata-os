@@ -1,29 +1,21 @@
 import { NextResponse } from "next/server";
-import { getLocalDb } from "@/lib/local-db";
-import { isMockAuth } from "@/lib/supabase/server";
+import { getWorkerDb } from "@/lib/cloud-db";
+import { cronFailure, cronGuard, isoDateParam } from "@/lib/cron";
 import { processControls, todayJakarta } from "@winata/db";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 300;
 
-function authorized(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
-
+/** GET /api/cron/controls — 20:00 WIB (13:00 UTC): kontrol harian K1–K7. */
 export async function GET(request: Request) {
-  if (!authorized(request)) {
-    return NextResponse.json({ error: "Tidak berwenang" }, { status: 401 });
+  const denied = cronGuard(request);
+  if (denied) return denied;
+  try {
+    const date = isoDateParam(new URL(request.url).searchParams.get("date")) ?? todayJakarta();
+    const controls = await processControls(await getWorkerDb(), date);
+    return NextResponse.json({ ok: true, date, count: controls.length, fail: controls.filter((row) => row.status === "fail").length });
+  } catch (error) {
+    return cronFailure(error);
   }
-  if (!isMockAuth()) {
-    return NextResponse.json(
-      { error: "Worker kontrol cloud belum diimplementasikan pada build lokal; lihat docs/QUESTIONS.md Q-11." },
-      { status: 501 },
-    );
-  }
-  const date = new URL(request.url).searchParams.get("date") ?? todayJakarta();
-  const db = await getLocalDb();
-  const controls = await processControls(db, date);
-  return NextResponse.json({ ok: true, date, count: controls.length, fail: controls.filter((row) => row.status === "fail").length });
 }

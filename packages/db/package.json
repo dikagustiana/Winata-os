@@ -7,7 +7,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./local": "./src/local-client.ts"
+    "./local": "./src/local-client.ts",
+    "./cloud": "./src/pg-cloud.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
@@ -15,6 +16,10 @@
   "dependencies": {
     "@electric-sql/pglite": "^0.3.14",
     "@winata/engine": "workspace:*",
-    "decimal.js": "^10.6.0"
+    "decimal.js": "^10.6.0",
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.23.1"
   }
 }

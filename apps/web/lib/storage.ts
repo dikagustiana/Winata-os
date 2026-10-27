@@ -1,8 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
-import { isMockAuth } from "./supabase/server";
-import { getServiceClient } from "./supabase/server";
+import { getServiceClient, hasServiceKey, isMockAuth } from "./supabase/server";
 
 const LOCAL_ROOT = path.resolve(process.cwd(), ".local-storage");
 
@@ -35,13 +34,15 @@ export async function putObject(
 }
 
 export async function signedUrl(bucket: Bucket, objectPath: string): Promise<string | null> {
+  // putObject menyimpan path "<bucket>/<objek>"; Storage hanya butuh "<objek>".
+  const relative = objectPath.startsWith(`${bucket}/`) ? objectPath.slice(bucket.length + 1) : objectPath;
   if (isMockAuth()) {
-    const relative = objectPath.startsWith(`${bucket}/`) ? objectPath.slice(bucket.length + 1) : objectPath;
     return `/api/storage/${bucket}/${relative}`;
   }
+  if (!hasServiceKey()) return null;
   const client = await getServiceClient();
   const storage = (client as unknown as { storage: { from: (bucket: string) => { createSignedUrl: (path: string, expires: number) => Promise<{ data: { signedUrl: string } | null; error: { message: string } | null }> } } }).storage;
-  const signed = await storage.from(bucket).createSignedUrl(objectPath, 60 * 60);
+  const signed = await storage.from(bucket).createSignedUrl(relative, 60 * 60);
   return signed.data?.signedUrl ?? null;
 }
 

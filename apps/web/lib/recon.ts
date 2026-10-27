@@ -1,4 +1,14 @@
-import { D, addDays, buildCorrectionProposal, buildBs04a, reconcile, reconstruct } from "@winata/engine";
+import {
+  D,
+  DEFAULT_COA_INVENTORY_EGG,
+  DEFAULT_COA_INVENTORY_VARIANCE,
+  addDays,
+  averageDailyByGrade,
+  buildCorrectionProposal,
+  buildBs04a,
+  reconcile,
+  reconstruct,
+} from "@winata/engine";
 import type {
   AccurateUploadRow,
   DataClient,
@@ -171,6 +181,42 @@ export interface ReconstructionResult {
   proposal: ReturnType<typeof buildCorrectionProposal>;
 }
 
+export interface ReconstructionSettings {
+  hppPerKg: number;
+  bookValueRp: number;
+  accounts: { inventory: string; variance: string };
+  basis: { production: "june_avg" | "period_avg"; outbound: "june_avg" | "period_avg" };
+}
+
+function textParam(params: Map<string, unknown>, key: string, fallback: string): string {
+  const value = params.get(key);
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : fallback;
+}
+
+/** R-70/R-71/R-73: parameter rekonstruksi (akun, nilai buku, basis estimasi). */
+export function reconstructionSettings(params: Map<string, unknown>): ReconstructionSettings {
+  const num = (key: string, fallback: number) => {
+    const value = params.get(key);
+    const parsed = typeof value === "string" ? Number(value) : typeof value === "number" ? value : Number.NaN;
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const basisRaw = params.get("reconstruct_missing_basis");
+  const basis = (basisRaw && typeof basisRaw === "object" ? basisRaw : {}) as Record<string, unknown>;
+  const pick = (value: unknown, fallback: "june_avg" | "period_avg") =>
+    value === "june_avg" || value === "period_avg" ? value : fallback;
+  return {
+    hppPerKg: num("hpp_per_kg", 17419),
+    bookValueRp: params.has("tb_total_rp")
+      ? num("tb_total_rp", 389792323)
+      : num("tb_egg_whole_rp", 383582877) + num("tb_egg_broken_rp", 6209446),
+    accounts: {
+      inventory: textParam(params, "coa_inventory_egg", DEFAULT_COA_INVENTORY_EGG),
+      variance: textParam(params, "coa_inventory_variance", DEFAULT_COA_INVENTORY_VARIANCE),
+    },
+    basis: { production: pick(basis.production, "june_avg"), outbound: pick(basis.outbound, "period_avg") },
+  };
+}
+
 /** R-43: rekonstruksi posisi target (default 30-06-2026) dari opname T0. */
 export async function computeReconstruction(
   client: DataClient,
@@ -178,6 +224,10 @@ export async function computeReconstruction(
   t0Date: string,
   bookValueRp: string,
   hppPerKg: string,
+  options: Pick<ReconstructionSettings, "accounts" | "basis"> = {
+    accounts: { inventory: DEFAULT_COA_INVENTORY_EGG, variance: DEFAULT_COA_INVENTORY_VARIANCE },
+    basis: { production: "june_avg", outbound: "period_avg" },
+  },
 ): Promise<ReconstructionResult | { error: string }> {
   const grades = ((await client.from("grade").select("id,code,name").eq("active", true).order("sort")).data as GradeRow[]) ?? [];
   const opname = ((await client
@@ -241,25 +291,55 @@ export async function computeReconstruction(
   for (let date = addDays(targetDate, 1); date <= t0Date; date = addDays(date, 1)) allDays.push(date);
   const missingDays = allDays.filter((date) => !recordedDates.includes(date));
 
-  const juneAverageDaily = await (async () => {
-    const juneRows = ((await client
-      .from("production")
-      .select("date,grade_id,kg")
-      .gte("date", `${targetDate.slice(0, 4)}-06-25`)
-      .lte("date", targetDate)
-      .is("deleted_at", null)).data as Array<{ date: string; grade_id: string; kg: string }>) ?? [];
-    const byGrade = new Map<string, { total: number; days: Set<string> }>();
-    for (const row of juneRows) {
-      const entry = byGrade.get(row.grade_id) ?? { total: 0, days: new Set<string>() };
-      entry.total += Number(row.kg);
-      entry.days.add(row.date);
-      byGrade.set(row.grade_id, entry);
+  // R-70: basis estimasi hari bolong. june_avg = 5 hari terakhir Juni;
+  // period_avg = rata-rata hari tercatat Juli..T0.
+  const juneStart = addDays(targetDate, -5);
+  const juneAverage = async (table: "production" | "outbound"): Promise<Array<{ gradeId: string; kg: string }>> => {
+    if (table === "production") {
+      const juneRows = ((await client
+        .from("production")
+        .select("date,grade_id,kg")
+        .gt("date", juneStart)
+        .lte("date", targetDate)
+        .is("deleted_at", null)).data as Array<{ date: string; grade_id: string; kg: string }>) ?? [];
+      const days = new Set(juneRows.map((row) => row.date)).size;
+      return averageDailyByGrade(juneRows.map((row) => ({ gradeId: row.grade_id, date: row.date, kg: row.kg })), days);
     }
-    return Array.from(byGrade.entries()).map(([gradeId, entry]) => ({
-      gradeId,
-      kg: entry.days.size > 0 ? entry.total / entry.days.size : 0,
-    }));
-  })();
+    const juneDo = ((await client
+      .from("outbound")
+      .select("id,date")
+      .gt("date", juneStart)
+      .lte("date", targetDate)
+      .in("status", ["dikirim", "diterima"])
+      .is("deleted_at", null)).data as Array<{ id: string; date: string }>) ?? [];
+    if (juneDo.length === 0) return [];
+    const juneLines = ((await client
+      .from("outbound_line")
+      .select("outbound_id,grade_id,kg_doc,kg_delivered")
+      .in("outbound_id", juneDo.map((row) => row.id))
+      .is("deleted_at", null)).data as Array<{ outbound_id: string; grade_id: string; kg_doc: string; kg_delivered: string | null }>) ?? [];
+    const days = new Set(juneDo.map((row) => row.date)).size;
+    return averageDailyByGrade(
+      juneLines.map((line) => ({ gradeId: line.grade_id, date: "", kg: line.kg_delivered ?? line.kg_doc })),
+      days,
+    );
+  };
+  const recordedDayCount = allDays.length - missingDays.length;
+  const periodOutbound = outboundLines.map((line) => ({
+    gradeId: line.grade_id,
+    date: outboundById.get(line.outbound_id)?.date ?? t0Date,
+    kg: line.kg_delivered ?? line.kg_doc,
+  }));
+  const juneAverageDaily = missingDays.length === 0
+    ? []
+    : options.basis.production === "june_avg"
+      ? await juneAverage("production")
+      : averageDailyByGrade(production.map((row) => ({ gradeId: row.grade_id, date: row.date, kg: row.kg })), recordedDayCount);
+  const outboundAverageDaily = missingDays.length === 0
+    ? []
+    : options.basis.outbound === "june_avg"
+      ? await juneAverage("outbound")
+      : averageDailyByGrade(periodOutbound, recordedDayCount);
 
   const t0Closing = opnameLines.map((line) => ({
     gradeId: line.grade_id,
@@ -280,6 +360,7 @@ export async function computeReconstruction(
     shrinkage: shrinkage.map((row) => ({ gradeId: row.grade_id, date: row.date, kg: row.kg })),
     correction: correction.map((row) => ({ gradeId: row.grade_id, date: row.effective_date, kg: row.kg })),
     juneAverageDaily,
+    outboundAverageDaily,
     missingDays,
   });
 
@@ -295,6 +376,7 @@ export async function computeReconstruction(
     rows: rows.map((row) => ({ gradeCode: row.gradeCode, kg: row.closing })),
     hppPerKg,
     bookValueRp,
+    accounts: options.accounts,
   });
   const lower = rows.reduce((acc, row) => acc.plus(row.lowerKg), D(0));
   const upper = rows.reduce((acc, row) => acc.plus(row.upperKg), D(0));

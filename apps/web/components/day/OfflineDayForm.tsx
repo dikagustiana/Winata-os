@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useRef, useState, type ReactNode } from "react";
 import type { ActionState } from "@/lib/action-types";
 import { clearDraft, loadDraft, saveDraft, type StoredDraft } from "@/lib/offline/draftStore";
+import { translateDbError } from "@/lib/errors";
 
 type ServerAction = (state: ActionState, formData: FormData) => Promise<ActionState>;
 
@@ -161,7 +162,7 @@ export function OfflineDayForm({
       <div aria-live="polite">
         {state.error ? (
           <div className="banner banner-fail" role="alert">
-            {state.error}
+            {translateDbError(state.error)}
             {state.conflict ? <div className="small">Draft di HP tidak ditimpa. Muat ulang setelah hari dibuka kembali.</div> : null}
           </div>
         ) : null}

@@ -16,12 +16,12 @@ jobs:
     env:
       CRON_SECRET: ci-secret
       NEXT_TELEMETRY_DISABLED: "1"
+      MOCK_AUTH_ALLOW_PRODUCTION_BUILD: "1"
     steps:
       - uses: actions/checkout@v4
 
+      # Versi pnpm diambil dari "packageManager" di package.json.
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
 
       - uses: actions/setup-node@v4
         with:

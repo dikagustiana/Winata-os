@@ -1,4 +1,4 @@
-import type { PGlite } from "@electric-sql/pglite";
+import type { Queryable } from "./queryable";
 import { computeControls, type ControlContext, type ControlResult } from "@winata/engine";
 import { getParameter, todayJakarta } from "./rebuild";
 
@@ -11,7 +11,7 @@ function nowWibTime(): string {
   }).format(new Date());
 }
 
-export async function buildControlContext(db: PGlite, date: string): Promise<ControlContext> {
+export async function buildControlContext(db: Queryable, date: string): Promise<ControlContext> {
   const locations = await db.query<{ id: string; code: string }>(
     `select id, code from location where active and deleted_at is null order by code`,
   );
@@ -51,10 +51,7 @@ export async function buildControlContext(db: PGlite, date: string): Promise<Con
   }>(
     `select pc.location_id as "locationId", pc.date, coalesce(l.diff_kg, 0) as "diffKg",
             g.code as "gradeCode", pc.note,
-            coalesce((
-              select sum(pd.closing) from position_daily pd
-               where pd.location_id = pc.location_id and pd.date = pc.date
-            ), 0) as "stockKg"
+            coalesce(l.computed_kg, 0) as "stockKg"
        from physical_count pc
        join physical_count_line l on l.physical_count_id = pc.id and l.deleted_at is null
        join grade g on g.id = l.grade_id
@@ -94,7 +91,7 @@ export async function buildControlContext(db: PGlite, date: string): Promise<Con
   };
 }
 
-export async function processControls(db: PGlite, date?: string): Promise<ControlResult[]> {
+export async function processControls(db: Queryable, date?: string): Promise<ControlResult[]> {
   const target = date ?? todayJakarta();
   const context = await buildControlContext(db, target);
   const results = computeControls(context);

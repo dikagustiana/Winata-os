@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { GradeRow, LocationRow, OpnameLineRow, OpnameRow } from "@winata/db";
 import { requireRole } from "@/lib/session";
 import { viewerClient } from "@/lib/data";
-import { getServiceClient } from "@/lib/supabase/server";
+import { getServiceClient, hasServiceKey } from "@/lib/supabase/server";
 import { signedUrl } from "@/lib/storage";
 import { fmtDate, fmtDateTime, fmtKg, fmtTime } from "@/lib/format";
 import { Card } from "@/components/ui/Card";
@@ -30,7 +30,8 @@ export default async function BaPage({ params }: { params: Promise<{ lokasi: str
   const grades = ((await client.from("grade").select("*")).data as GradeRow[]) ?? [];
   const gradeById = new Map(grades.map((grade) => [grade.id, grade]));
 
-  const service = await getServiceClient();
+  // Nama penanda tangan: kunci layanan bila ada; selain itu klien pengguna (RLS).
+  const service = hasServiceKey() ? await getServiceClient() : client;
   const userIds = [opname.counter_id, opname.witness_id, opname.manager_id].filter(Boolean) as string[];
   const users = userIds.length
     ? ((await service.from("app_user").select("id,name,role").in("id", userIds)).data as Array<{ id: string; name: string; role: string }>) ?? []

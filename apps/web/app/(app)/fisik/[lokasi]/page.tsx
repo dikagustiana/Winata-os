@@ -12,7 +12,9 @@ import { ActionForm } from "@/components/ui/ActionForm";
 import { EstimateTag, StatusChip } from "@/components/ui/StatusChip";
 import { signedUrl } from "@/lib/storage";
 import { PhysicalForm, type GradeConversion } from "@/components/fisik/PhysicalForm";
+import { TextInput } from "@/components/ui/Inputs";
 import {
+  cancelOpnameAction,
   markCheckedAction,
   savePhysicalCountAction,
   signOpnameAction,
@@ -270,6 +272,21 @@ export default async function FisikPage({
               </div>
             ))}
             {opname?.status === "signed" ? <Banner tone="ok">BA terkunci. Perubahan hanya lewat koreksi accounting.</Banner> : null}
+            {opname?.status === "signed" && (viewer.role === "accounting" || viewer.role === "admin") ? (
+              <ActionForm
+                action={cancelOpnameAction}
+                buttons={[
+                  {
+                    label: "Batalkan BA",
+                    variant: "danger",
+                    confirm: "Batalkan BA opname ini? Posisi akan dibangun ulang dari tanggal ini.",
+                  },
+                ]}
+              >
+                <input type="hidden" name="opname_id" value={opname.id} />
+                <TextInput name="delete_reason" label="Alasan pembatalan" help="Wajib minimal 10 karakter." />
+              </ActionForm>
+            ) : null}
           </div>
 
           <div className="divider" />

@@ -10,6 +10,8 @@ import { SelectInput, TextInput } from "@/components/ui/Inputs";
 import { fmtDateTime } from "@/lib/format";
 import { assignLocationsAction, createUserAction, setPasswordAction, updateUserAction } from "@/lib/actions/admin";
 import { saveParameterAction } from "@/lib/actions/master";
+import { StatusChip } from "@/components/ui/StatusChip";
+import { SERVICE_KEY_MISSING, hasServiceKey } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +47,7 @@ export default async function AdminPage({
 
   const users = ((await client.from("app_user").select("id,email,name,role,active").is("deleted_at", null).order("email")).data as ProfileRow[]) ?? [];
   const locations = await loadLocations(client, viewer);
-  const assignments = ((await client.from("user_location").select("user_id,location_id")).data as UserLocationRow[]) ?? [];
+  const assignments = ((await client.from("user_location").select("user_id,location_id").is("deleted_at", null)).data as UserLocationRow[]) ?? [];
   const parameters = ((await client.from("parameter").select("*").is("deleted_at", null).order("key")).data as ParameterRow[]) ?? [];
   const audit = ((await client.from("audit_log").select("*").order("id", { ascending: false }).limit(50)).data as AuditRow[]) ?? [];
 
@@ -58,6 +60,12 @@ export default async function AdminPage({
   return (
     <>
       <PageHead title="Admin" sub="Pengguna, peran, penugasan lokasi, parameter, dan audit." />
+      {!hasServiceKey() ? (
+        <div className="row" style={{ marginBottom: 12 }}>
+          <StatusChip status="warn" label="Unggah foto belum aktif" title={SERVICE_KEY_MISSING} />
+          <StatusChip status="warn" label="Buat akun lewat layar ini belum aktif" title={SERVICE_KEY_MISSING} />
+        </div>
+      ) : null}
       <nav className="tabs" aria-label="Admin">
         {TABS.map((item) => (
           <Link key={item.key} href={`/admin?tab=${item.key}`} aria-current={tab === item.key ? "page" : undefined}>

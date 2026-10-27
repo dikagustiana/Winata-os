@@ -11,12 +11,13 @@ import { DataTable } from "@/components/ui/DataTable";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { DateInput, QuantityInput, SelectInput, TextInput } from "@/components/ui/Inputs";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { createOutboundAction } from "@/lib/actions/outbound";
+import { cancelOutboundAction, createOutboundAction, markReceivedAction } from "@/lib/actions/outbound";
 
 export const dynamic = "force-dynamic";
 
-export default async function DoPage() {
+export default async function DoPage({ searchParams }: { searchParams: Promise<{ batal?: string }> }) {
   const viewer = await requireRole(["marketing", "accounting", "admin"]);
+  const params = await searchParams;
   const client = await viewerClient(viewer);
   const today = todayJakarta();
 
@@ -39,6 +40,7 @@ export default async function DoPage() {
   const locationById = new Map(locations.map((row) => [row.id, row]));
   const gradeById = new Map(grades.map((row) => [row.id, row]));
 
+  const cancelTarget = params.batal ? outbounds.find((row) => row.id === params.batal && row.status === "draft") ?? null : null;
   const todayDo = outbounds.filter((row) => row.date === today);
   const draftCount = outbounds.filter((row) => row.status === "draft").length;
   const totalKgDoc = lines.reduce((acc, line) => acc.plus(line.kg_doc), new Decimal(0));
@@ -124,6 +126,7 @@ export default async function DoPage() {
               { key: "doc", label: "Dok kg", numeric: true },
               { key: "serah", label: "Serah kg", numeric: true },
               { key: "status", label: "Status" },
+              { key: "aksi", label: "" },
             ]}
             rows={doRows.map(({ row, docKg, deliveredKg }) => ({
               __key: row.id,
@@ -139,11 +142,40 @@ export default async function DoPage() {
                   label={row.status === "draft" ? "Draft" : row.status === "dikirim" ? "Dikirim" : "Diterima"}
                 />
               ),
+              aksi:
+                row.status === "dikirim" ? (
+                  <ActionForm action={markReceivedAction} submitLabel="Tandai diterima">
+                    <input type="hidden" name="outbound_id" value={row.id} />
+                  </ActionForm>
+                ) : row.status === "draft" ? (
+                  <Link href={`/do?batal=${row.id}`} className="btn btn-sm">
+                    Batalkan
+                  </Link>
+                ) : null,
             }))}
             empty="Belum ada DO."
           />
         </Card>
       </div>
+
+      {cancelTarget ? (
+        <Card title={`Batalkan DO ${cancelTarget.do_number}`} sub="Data tetap tersimpan dengan jejak; posisi dibangun ulang.">
+          <ActionForm
+            action={cancelOutboundAction}
+            buttons={[{ label: "Batalkan DO", variant: "danger", confirm: "Yakin membatalkan DO ini?" }]}
+          >
+            <input type="hidden" name="outbound_id" value={cancelTarget.id} />
+            <TextInput
+              name="delete_reason"
+              label="Alasan pembatalan"
+              help="Wajib minimal 10 karakter bila hari sudah disetujui manager."
+            />
+          </ActionForm>
+          <p className="small" style={{ marginTop: 8 }}>
+            <Link href="/do">Kembali tanpa membatalkan</Link>
+          </p>
+        </Card>
+      ) : null}
 
       <Card title="Rincian per grade" sub="Harga dan nilai dokumen">
         <DataTable
@@ -179,8 +211,8 @@ export default async function DoPage() {
       </Card>
 
       <Banner tone="info">
-        Nomor DO unik per lokasi. Nomor loncat atau ganda menghasilkan peringatan di dashboard. Serah dikonfirmasi
-        kandang di layar Hari ini.
+        Nomor DO unik per lokasi. Nomor loncat atau ganda menghasilkan peringatan di dashboard. Serah DO dikonfirmasi
+        oleh petugas kandang di layar Hari. Marketing hanya membuat dan menerima DO.
       </Banner>
       <p className="small muted" style={{ marginTop: 8 }}>
         Rencana jual dan harga acuan ada di <Link href="/rencana">Rencana jual</Link>.

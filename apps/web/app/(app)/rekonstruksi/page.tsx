@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { requireRole } from "@/lib/session";
 import { loadParameters, paramNumber, viewerClient } from "@/lib/data";
-import { computeReconstruction } from "@/lib/recon";
+import { computeReconstruction, reconstructionSettings } from "@/lib/recon";
 import { todayJakarta } from "@winata/db";
 import { fmtDate, fmtKg, fmtRp, fmtRpJt, fmtPct } from "@/lib/format";
 import { Card, PageHead, Banner, Metric } from "@/components/ui/Card";
 import { DataTable } from "@/components/ui/DataTable";
-import { EstimateTag } from "@/components/ui/StatusChip";
+import { EstimateTag, StatusChip } from "@/components/ui/StatusChip";
 
 export const dynamic = "force-dynamic";
 
@@ -20,16 +20,18 @@ export default async function RekonstruksiPage({
   const client = await viewerClient(viewer);
   const today = todayJakarta();
   const params = await loadParameters(client, today);
-  const hpp = paramNumber(params, "hpp_per_kg", 17419);
+  const settings = reconstructionSettings(params);
+  const hpp = settings.hppPerKg;
   const defaultTarget = String(params.get("reconstruction_target_date") ?? "2026-06-30").replace(/"/g, "");
-  const bookDefault =
-    paramNumber(params, "tb_egg_whole_rp", 383582877) + paramNumber(params, "tb_egg_broken_rp", 6209446);
+  const bookDefault = settings.bookValueRp;
+  // Q-21: nilai buku default (jumlah dua akun TB) menunggu konfirmasi pemilik.
+  const bookUnconfirmed = paramNumber(params, "tb_total_rp", 389792323) === 389792323;
 
   const target = /^\d{4}-\d{2}-\d{2}$/.test(query.target ?? "") ? query.target! : defaultTarget;
   const t0 = /^\d{4}-\d{2}-\d{2}$/.test(query.t0 ?? "") ? query.t0! : "2026-07-01";
   const book = query.book ?? String(bookDefault);
 
-  const result = await computeReconstruction(client, target, t0, book, String(hpp));
+  const result = await computeReconstruction(client, target, t0, book, String(hpp), settings);
 
   return (
     <>
@@ -71,7 +73,20 @@ export default async function RekonstruksiPage({
               <Metric value={fmtRpJt(result.totalValueRp)} sub={<EstimateTag />} />
             </Card>
             <Card title="Nilai buku (TB)">
-              <Metric value={fmtRpJt(result.bookValueRp)} sub="Telur utuh + pecah" />
+              <Metric
+                value={fmtRpJt(result.bookValueRp)}
+                sub={
+                  bookUnconfirmed ? (
+                    <StatusChip
+                      status="warn"
+                      label="Nilai buku belum dikonfirmasi"
+                      title="Isi parameter tb_total_rp di Admin → Parameter setelah dikonfirmasi pemilik."
+                    />
+                  ) : (
+                    "Telur utuh + pecah"
+                  )
+                }
+              />
             </Card>
             <Card title="Selisih vs TB">
               <Metric
@@ -120,17 +135,56 @@ export default async function RekonstruksiPage({
                 value: fmtRp(Number(row.closing) * hpp),
               }))}
               footer={
-                <tr>
-                  <td>Total</td>
-                  <td colSpan={5} />
-                  <td className="num">{fmtKg(result.totalClosingKg, 1)}</td>
-                  <td className="num">{fmtRp(result.totalValueRp)}</td>
-                </tr>
+                <>
+                  <tr>
+                    <td>Total</td>
+                    <td colSpan={5} />
+                    <td className="num">{fmtKg(result.totalClosingKg, 1)}</td>
+                    <td className="num">{fmtRp(result.totalValueRp)}</td>
+                  </tr>
+                  {result.hasMissing ? (
+                    <>
+                      <tr>
+                        <td colSpan={6}>
+                          Batas bawah (estimasi){" "}
+                          <StatusChip
+                            status="estimate"
+                            label="Estimasi"
+                            title="Closing dikurangi rata-rata produksi harian 5 hari terakhir Juni × jumlah hari tanpa data."
+                          />
+                        </td>
+                        <td className="num">{fmtKg(result.lowerKg, 1)}</td>
+                        <td />
+                      </tr>
+                      <tr>
+                        <td colSpan={6}>
+                          Batas atas (estimasi){" "}
+                          <StatusChip
+                            status="estimate"
+                            label="Estimasi"
+                            title="Closing ditambah rata-rata keluar harian yang tercatat Juli–T0 × jumlah hari tanpa data."
+                          />
+                        </td>
+                        <td className="num">{fmtKg(result.upperKg, 1)}</td>
+                        <td />
+                      </tr>
+                    </>
+                  ) : null}
+                </>
               }
             />
           </Card>
 
           <Card title="Draft Usulan Koreksi (Dr/Cr)" sub={`Referensi RS-05 · ${result.proposal.balanced ? "seimbang" : "tidak seimbang"}`}>
+            {!result.proposal.accountsConfirmed ? (
+              <div className="row" style={{ marginBottom: 8 }}>
+                <StatusChip
+                  status="warn"
+                  label="Akun belum dikonfirmasi"
+                  title="Isi parameter coa_inventory_egg dan coa_inventory_variance di Admin → Parameter."
+                />
+              </div>
+            ) : null}
             <DataTable
               columns={[
                 { key: "account", label: "Akun" },

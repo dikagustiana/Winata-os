@@ -14,18 +14,20 @@ import {
 } from "./common";
 import { loadConversionVersions } from "@/lib/convert";
 import { parseIdNumber } from "@/lib/format";
-import { isMockAuth } from "@/lib/supabase/server";
-import { getLocalDb } from "@/lib/local-db";
+import { getWorkerDb } from "@/lib/cloud-db";
 import type { ActionState } from "@/lib/action-types";
 
 const ROLES: AppRole[] = ["accounting", "admin"];
 
+/**
+ * Setelah impor massal: proses antrean yang diisi trigger (from_date terkecil
+ * per lokasi), lalu proyeksi dan kontrol. Sisa antrean diambil cron.
+ */
 async function runBulkWorker(): Promise<void> {
-  if (!isMockAuth()) return;
   try {
-    const { rebuildAll, refreshProjection, processControls, todayJakarta } = await import("@winata/db");
-    const db = await getLocalDb();
-    await rebuildAll(db);
+    const { processRebuildQueue, refreshProjection, processControls, todayJakarta } = await import("@winata/db");
+    const db = await getWorkerDb();
+    await processRebuildQueue(db, 10);
     await refreshProjection(db);
     await processControls(db, todayJakarta());
   } catch (error) {
