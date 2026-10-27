@@ -36,6 +36,7 @@ Kolom **Jawaban** diisi pemilik. Selama kosong, kode memakai default di kolom ke
 | Q-29 | BA opname bertanda tangan: lampiran foto sesudah tanda tangan | Diizinkan (hanya `photo_note`); angka/kolom lain immutable | | keputusan agen |
 | Q-30 | App cloud sebelum `SUPABASE_SERVICE_ROLE_KEY` diisi | Login, sesi, aksi, dan worker tidak memakai kunci layanan (RLS + `SUPABASE_DB_URL`); hanya buat akun/ganti kata sandi di `/admin` dan unggah foto/berkas yang menunggu kunci (chip kuning) | | keputusan agen |
 | Q-31 | `user_location` dengan soft delete | Kunci utama diganti `id`; unik aktif `(user_id, location_id) where deleted_at is null` agar penugasan bisa dilepas lalu diberikan lagi | | keputusan agen |
+| Q-32 | Vercel Hobby hanya mengizinkan cron 1x/hari | Diputuskan pemilik 27-10-2026: `/api/cron/rebuild` harian 17:00 UTC (00:00 WIB), `/api/cron/controls` 13:00 UTC (20:00 WIB). Posisi tetap diperbarui inline saat input (≤ 7 tanggal); cron menyapu antrean sisanya. Kembali ke tiap jam bila upgrade Pro | | terjawab pemilik |
 
 ## Catatan konflik dokumen
 
