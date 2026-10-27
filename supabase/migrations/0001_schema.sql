@@ -11,12 +11,20 @@
 -- ---------------------------------------------------------------------------
 create schema if not exists auth;
 
-create table if not exists auth.users (
-  id uuid primary key default gen_random_uuid(),
-  email text not null unique,
-  password_hash text,
-  created_at timestamptz not null default now()
-);
+-- Di dalam DO agar tidak diperiksa hak CREATE di schema auth bila tabel sudah
+-- ada (Supabase: role postgres tidak punya CREATE di schema auth).
+do $$
+begin
+  if to_regclass('auth.users') is null then
+    create table auth.users (
+      id uuid primary key default gen_random_uuid(),
+      email text not null unique,
+      password_hash text,
+      created_at timestamptz not null default now()
+    );
+  end if;
+end;
+$$;
 
 do $$
 begin
