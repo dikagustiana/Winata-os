@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
   "crons": [
-    { "path": "/api/cron/rebuild", "schedule": "0 * * * *" },
+    { "path": "/api/cron/rebuild", "schedule": "0 17 * * *" },
     { "path": "/api/cron/controls", "schedule": "0 13 * * *" }
   ]
 }

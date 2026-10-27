@@ -101,7 +101,7 @@ dibuat dulu, lalu akun Auth; trigger menyamakan `app_user.id = auth.users.id`).
   `0005_hdp`, `0006_item_map`. Admin pertama: `insert into app_user …` lalu
   `select create_login('<email>', '<sandi>')` (SQL Editor / service role).
 - Vercel: root `apps/web`, install `pnpm install --frozen-lockfile`, build `pnpm --filter @winata/web build`,
-  region `sin1`, cron di `apps/web/vercel.json`.
+  region `sin1`, cron di `apps/web/vercel.json` (Hobby: rebuild harian 00:00 WIB, kontrol 20:00 WIB; Q-32).
 - Env (production + preview):
 
 | Variabel | Isi |
