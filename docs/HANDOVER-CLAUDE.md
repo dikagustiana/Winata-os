@@ -58,85 +58,39 @@ mengisi `rebuild_queue` → worker menghitung `position_daily` / `projection_dai
 
 ## 3. P0 — pekerjaan wajib sebelum production
 
-### 3.1 Worker cloud (Q-11) — **blocker utama**
+### 3.1 Worker cloud (Q-11) — **ditutup di v1.1 (M8)**
 
-Saat ini worker hanya berjalan di PGlite:
+Worker cloud memakai kode worker yang sama (`packages/db/src/{rebuild,controls,outlook-worker}.ts`)
+lewat antarmuka `Queryable` (K17):
 
-- `apps/web/app/api/cron/rebuild/route.ts` dan `…/controls/route.ts` mengembalikan
-  **501** bila `MOCK_AUTH != "1"`.
-- `apps/web/lib/actions/common.ts#rebuildLocal` langsung `return` bila bukan mock,
-  sehingga posisi tidak diperbarui inline di cloud.
-- `packages/db/src/rebuild.ts`, `controls.ts`, `outlook-worker.ts` menerima `PGlite`.
+- Lokal/e2e: PGlite. Cloud: `createCloudDb(SUPABASE_DB_URL)` (`packages/db/src/pg-cloud.ts`, `pg.Pool`
+  max 1 ke pooler Supabase transaction mode, parser tipe sama dengan PGlite).
+- `apps/web/lib/cloud-db.ts#getWorkerDb()`; `GET /api/cron/rebuild` dan `/api/cron/controls` tidak lagi
+  501: 401 tanpa bearer, 503 tanpa `SUPABASE_DB_URL`, `maxDuration 300`, ≤ 10 lokasi per invokasi,
+  bootstrap `?full=1&from=YYYY-MM-DD`.
+- `lib/actions/common.ts#rebuildLocal`: di cloud inline ≤ 7 tanggal, sisanya antrean + cron.
+- Antrean bergenerasi (R-65): `claim_rebuild` → `generation`; `mark_rebuild_done(location, generation)`.
+- Worker terhubung sebagai role `winata_worker` (bypassrls), bukan service-role key.
+- Bukti: `docs/log/M8.md` (posisi `pg` identik dengan PGlite pada PostgreSQL 16 sungguhan).
 
-**Yang harus dibuat Claude Code** (pilih satu, rekomendasi A):
+### 3.2 Identitas Auth = `app_user.id` (v1.1, R-64)
 
-**A. Adapter service-role di Vercel (paling sederhana, memakai engine yang sudah ada)**
+RLS memakai `auth.uid()`, jadi `app_user.id` wajib sama dengan `auth.users.id`. Sejak 0008:
 
-1. Buat `packages/db/src/cloud-worker.ts` (atau `apps/web/lib/cloud-worker.ts`):
-   - fungsi `loadRebuildInput(service, toDate)` memuat:
-     `location`, `grade`, `opname` + `opname_line` (hanya `status='signed'`),
-     `production`, `outbound` + `outbound_line` (`status in ('dikirim','diterima')`,
-     `kg = coalesce(kg_delivered,kg_doc)`), `transfer`, `shrinkage`,
-     `correction` (`status='posted'`), parameter `hpp_per_kg`, `age_buckets_days`.
-   - **wajib paginasi** `.range(from, from+999)`; PostgREST default membatasi 1000 baris.
-   - panggil `computePosition()` dari `@winata/engine`; tulis `position_daily`
-     dengan upsert berkelompok ±150 baris memakai `service.from("position_daily").upsert(rows,
-     { onConflict: "location_id,grade_id,date" })`.
-   - `claim_rebuild(n)` dan `mark_rebuild_done(location)` adalah RPC `security definer`
-     yang sudah di-grant ke `service_role` (migrasi `0003`).
-2. Sambungkan ke route cron: hapus guard 501, panggil adapter, lalu
-   `refreshProjectionCloud()` dan `processControlsCloud()`. Tambahkan
-   `export const maxDuration = 300;` dan batasi jumlah lokasi per invokasi (mis. 10).
-3. Di `lib/actions/common.ts`, buat `rebuildLocal` memakai adapter cloud saat
-   `!isMockAuth()` dan tetap memproses ≤7 tanggal secara inline supaya angka
-   dashboard berubah setelah submit (K1/K2 membutuhkan `position_daily` segar).
-4. Bootstrap awal: setelah BA T0 diimpor, jalankan satu kali build penuh
-   T0…hari ini (lewat route dengan `from_date=T0` atau skrip Node service-role).
-   Jangan mengandalkan cron per jam untuk 100+ hari pertama.
-
-**B. Edge Function/cron terpisah** — hanya bila A tidak memungkinkan; tetap wajib
-memakai engine yang sama, bukan menghitung ulang di SQL.
-
-**Kriteria terima:**
-- `GET /api/cron/rebuild` dengan bearer mengembalikan 200, bukan 501.
-- `rebuild_queue` kosong/`done` setelah cron; `position_daily` berisi T0…hari ini
-  untuk semua (lokasi × grade).
-- Dashboard menampilkan posisi setelah transaksi disimpan tanpa menunggu cron.
-- Angka `position_daily` sama dengan hasil `pnpm test` (golden) pada data uji.
-
-### 3.2 Identitas Auth = `app_user.id`
-
-RLS memakai `auth.uid()`, jadi **`app_user.id` wajib sama dengan `auth.users.id`**.
-
-- `createUserAction` (`apps/web/lib/actions/admin.ts`) **sudah diperbaiki** pada
-  commit handover: di cloud ia membuat user Auth lebih dulu, lalu memakai
-  `created.user.id` untuk `app_user`. Verifikasi di staging.
-- **Admin pertama** (chicken-and-egg):
-  1. Supabase Dashboard → Authentication → Users → *Add user* (`dika@…`, password kuat).
-  2. Salin UID, jalankan di SQL Editor:
-     ```sql
-     insert into public.app_user (id, email, name, role, active)
-     values ('<AUTH_UID>', 'dika@winata.co.id', 'Dika', 'admin', true);
-     -- penugasan bila perlu:
-     -- insert into public.user_location (user_id, location_id)
-     -- values ('<AUTH_UID>', '<LOCATION_ID>');
-     ```
-  3. Login sebagai admin → buat 6 akun lain lewat `/admin` (alur yang sudah benar).
-- **Seed `0003_users.sql` hanya untuk lokal/e2e.** File itu membuat 9 `app_user`
-  dengan ID acak tanpa baris `auth.users`; jangan dijalankan di production.
-  Untuk staging: jalankan seed master/flok/HDP/item_map saja, atau bersihkan
-  setelah uji:
+- Trigger `auth_users_link` (after insert `auth.users`) menyamakan `app_user.id` dengan id Auth bila
+  e-mailnya sudah ada di `app_user`; semua FK ke `app_user(id)` `on update cascade`, `created_by` ikut.
+- **Alur app** (`createUserAction`): `app_user` dibuat dulu (id sementara) → `auth.admin.createUser`
+  (allow-list meloloskan) → trigger menaut. Bila Auth gagal, `app_user` dibatalkan (`deleted_at`).
+  `setPasswordAction` memakai `getUserById(app_user.id)`.
+- **Admin pertama** (SQL Editor / MCP `execute_sql`, berjalan sebagai `postgres`):
   ```sql
-  -- hanya staging, sebelum data nyata
-  update opname set counter_id = null, witness_id = null, manager_id = null
-   where counter_id in (select id from app_user where email like '%@winata.test');
-  delete from user_location where user_id in (select id from app_user where email like '%@winata.test');
-  delete from app_user where email like '%@winata.test';
+  insert into public.app_user (email, name, role) values ('dika.g.irawan@gmail.com', 'Dika', 'admin');
+  select public.create_login('dika.g.irawan@gmail.com', '<kata sandi kuat>');
   ```
-  (Di DB staging baru, tabel transaksi belum mereferensikan user seed kecuali
-  opname contoh; hapus/ubah opname contoh lebih dulu.)
-- `setPasswordAction` di cloud memakai `auth.admin.listUsers()` (default 50);
-  bila pengguna >50 tambahkan paginasi sebelum dipakai luas.
+  `create_login` menulis `auth.users` + `auth.identities` lengkap dengan id = `app_user.id`.
+- Seed `0003_users.sql` hanya untuk lokal/e2e; jangan dijalankan di production.
+- Login/sesi cloud tidak butuh service-role key (klien pengguna + RLS); kunci itu hanya untuk
+  `/admin` (buat akun, kata sandi) dan Storage.
 
 ### 3.3 Storage (foto BA, lampiran, upload Accurate)
 
