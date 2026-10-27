@@ -168,11 +168,10 @@ describe("rollForward: posisi sampai hari ini tanpa transaksi baru", () => {
     expect(await rollForward(db, "2026-10-26")).toBeNull();
   });
 
-  it("tabel kosong dibangun penuh dari jangkar T0", async () => {
+  it("tabel kosong tidak dibangun (bootstrap T0 lewat ?full=1)", async () => {
     await q(`delete from position_daily`);
-    const result = await rollForward(db, "2026-10-26");
-    expect(result?.fromDate).toBe("2026-07-01");
-    const row = await position(SLP, "2026-10-26");
-    expect(row).toBeDefined();
+    expect(await rollForward(db, "2026-10-26")).toBeNull();
+    const count = await q<{ n: string }>(`select count(*)::text as n from position_daily`);
+    expect(count[0].n).toBe("0");
   });
 });

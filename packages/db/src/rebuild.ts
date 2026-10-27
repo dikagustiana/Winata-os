@@ -281,13 +281,13 @@ export async function rebuildAll(db: Queryable, toDate?: string): Promise<Rebuil
  * Isi position_daily sampai hari ini walau tidak ada transaksi baru: aging dan
  * hari stok berubah tiap hari, dan kontrol membaca posisi hari ini. Antrean hanya
  * terisi oleh transaksi, jadi hari tanpa input tidak pernah dibangun tanpa ini.
- * Tabel kosong = bangun penuh dari jangkar T0.
+ * Tabel kosong = belum ada BA T0; bootstrap tetap eksplisit lewat cron
+ * `?full=1&from=<T0>` supaya tidak menulis baris nol sebelum T0 asli.
  */
 export async function rollForward(db: Queryable, today = todayJakarta()): Promise<RebuildResult | null> {
   const result = await db.query<{ last: string | null }>(`select max(date)::text as last from position_daily`);
   const last = result.rows[0]?.last ?? null;
-  if (last === null) return rebuildPositions(db, { toDate: today });
-  if (last >= today) return null;
+  if (last === null || last >= today) return null;
   return rebuildPositions(db, { fromDate: addDays(last, 1), toDate: today });
 }
 
